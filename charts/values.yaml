@@ -1,0 +1,488 @@
+---
+
+#--- Ingress ---#
+ingress_enabled: false # enable ingress / cloud load balancer
+cloud_ingress_type: gcp # gcp (GKE gce) | aws (ALB) | azure (App Gateway AGIC)
+
+ingress:
+  annotations: {}  # extra Ingress annotations (e.g. certificate / static IP)
+  sticky:
+    cookieName: elitea-route
+    cookieTtlSeconds: 86400
+
+#--- Embedded PGSLQ/Redis ---#
+embedded_services_redis: true # enable embedded redis
+embedded_services_pgsql: true # enable embedded pgsql
+redis_aws_cloud: false # set to true if using AWS ElastiCache Redis
+
+redis_queue_random_suffix: xEd34
+pylons_mesh_enabled: false # set to true to enable pylons mesh
+autocreate_db: true
+hmac_auto_generate: true # true: generate empty common.secrets.hmacs keys (kept stable across upgrades); false: you must set them
+tracing_enabled: false # set to true to enable distributed tracing
+
+#--- Proxy settings ---#
+external_proxy_enabled: false # also enable external_ca_enabled if the proxy needs a custom CA
+http_proxy: "proxy.example.com" # external http proxy host
+https_proxy: "proxy.example.com" # external https proxy host
+no_proxy: "localhost" # no proxy
+
+#--- External CA ---#
+external_ca_enabled: false # mount CA certs from an existing ConfigMap into /cacerts
+external_ca_configmap: "" # kubectl -n <ns> create configmap my-cas --from-file=corp-ca.crt
+external_ca_files: [] # file names inside that ConfigMap, e.g. [corp-ca.crt]
+
+#--- SAML (sso_provider: saml) ---#
+# existing Secret with keys: sp_key, sp_cert, idp_cert (or idp_metadata when saml_idp_use_metadata).
+# values must be single-line PEMs with literal \n escapes, e.g.:
+#   kubectl -n <ns> create secret generic saml \
+#     --from-literal=sp_key="$(awk 'NF{printf "%s\n",$0}' sp.key)" ...
+saml_existing_secret: ""
+saml_idp_use_metadata: false
+
+common:
+  name_prefix: elitea
+  image: "ghcr.io/eliteaai/pylon:1.2.28"
+  tools_enabled: false # true | false
+  elitea_repo_type: standard # standard | internal
+  release: "2.0.7"
+
+  images:
+    curl: "curlimages/curl:8.22.0"
+    redis: "redis:8.10.3-alpine"
+    postgres: "pgvector/pgvector:0.8.7-pg18-trixie"
+    deepwiki_worker: "ghcr.io/eliteaai/deepwiki-worker:1.0.8"
+    inventory_worker: "ghcr.io/eliteaai/inventory-worker:1.0.8"
+    otel_collector: "otel/opentelemetry-collector-contrib:0.140.0"
+    mcp_grafana: "ghcr.io/eliteaai/grafana-mcp:1.0.0"
+    mcp_ado: "ghcr.io/eliteaai/ado-mcp:v2.9.0-elitea.1"
+    internal_repo: "ghcr.io/eliteaai/repo:2.0.7"
+
+  config:
+    #--- APP config ---#
+    app_proto: "http"  #  set to https when ingress or service use tls
+    cookies_secure: "false"  # set to true when app_proto is https
+    cookies_lifetime: "604800"  # in seconds, e.g. 7200 for 2 hours
+    app_host: "localhost"  # public URL domain or IP
+    debug: "false"  # set to true to enable debug logging
+    sandbox_timeout_seconds: "30" # default 30
+
+    redis_host: ""  # redis domain or IP when NOT embedded
+    redis_port: "6379"  # redis port, 6380 for ssl
+    redis_ssl: "false"  # set to true in case of ssl
+
+    postgres_host: ""  # postgres domain or IP when NOT embedded
+    postgres_port: "5432"  # postgres port
+    postgres_db: "eliteadb"  # main (app) DB name, this should be present (created) before helm install
+    
+    ai_project_allowed_domains: "centry.user"
+    #--- SSO ---#
+    sso_provider: form # form | saml | oidc
+    sso_token_expiration: 86400 # in seconds
+
+    #--- SSO OIDC Configs ---#
+
+    # authorization_endpoint: "https://login.microsoftonline.com/8f361xxx-7***-*79*-ad*3-c1a24d6cxxxx/oauth2/v2.0/authorize" # <<< tenant ID
+    #
+    # end_session_endpoint: "https://login.microsoftonline.com/8f361xxx-7***-*79*-ad*3-c1a24d6cxxxx/oauth2/v2.0/logout" # <<< tenant ID
+    # metadata_endpoint: "https://login.microsoftonline.com/8f361xxx-7***-*79*-ad*3-c1a24d6cxxxx/v2.0/.well-known/openid-configuration" # <<< tenant ID
+    # token_endpoint: "https://login.microsoftonline.com/8f361xxx-7***-*79*-ad*3-c1a24d6cxxxx/oauth2/v2.0/token" # <<< tenant ID
+    # url_mode: "external"
+    # userinfo_endpoint: "https://graph.microsoft.com/oidc/userinfo"
+
+    #--- SSO SAML ---#
+    # authn_destination: "https://idp.example.com/sso"
+    # logout_destination: "https://idp.example.com/slo"
+    #
+    # saml_issuer: "https://idp.example.com/saml/metadata"
+
+  # Name of a Secret you created with ALL the keys below (postgres_user, postgres_password, redis_password,
+  # the 5 *_hmac_key, application_auth_secret_key, default_admin_password, application_main_secret_key,
+  # secrets_master_key, plus OIDC keys if used). When set, the chart creates no secrets and ignores `secrets:`.
+  existingSecret: ""
+
+  secrets:
+    #--- PGSQL/Redis ---#
+    redis_password: ""  # redis password, set to empty if not password protected
+    postgres_user: "eliteadb"  # postgres user, should be present before helm install
+    postgres_password: ""  # postgres password, should be present before helm install
+
+    #--- Pylons hmac keys (see hmac_auto_generate) ---#
+    hmacs:
+      rpc_hmac_key: "" # >  openssl rand 40 | base64  | tr '/+' '_-'
+      event_hmac_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
+      exposure_hmac_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
+      indexer_hmac_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
+      mesh_hmac_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
+
+    #--- Pylon auth --- encryption keys: must be set by you and NEVER changed after first install ---#
+    auth:
+      application_auth_secret_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
+      default_admin_password: "" # generate
+    
+    main:
+      application_main_secret_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
+      secrets_master_key: "" # should be fernet key:>  openssl rand 32 | openssl base64 -A | tr '+/' '-_'
+
+    
+    #--- SSO secrets ---#
+
+    #--- OIDC Secrets ---#
+
+    # client_id: "ex6x438x-2xx1-44xx-a30b-ccdxxxx8635x" # <<< CLIENT ID
+    # client_secret: "3gLfgxxxxxxxxxxxxx3sSusbcf"
+
+    #--- SAML keys/certs: see saml_existing_secret at the top ---#
+
+
+#--- Pylons Configs ---#
+pylon_auth:
+  name_prefix: pylon-auth
+  log_level: info
+
+  storage:
+    class: "premium-rwo"
+    size: "1Gi"
+
+  resources:
+    vpa_enabled: false
+    mode: "Off" # "Off" | "Auto" | "Initial" | "Recreate" | "InPlace" | "InPlaceOrRecreate"
+    requests:
+      cpu: "1"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "512Mi"
+
+pylon_main:
+  name_prefix: pylon-main
+  log_level: info
+
+  storage:
+    class: "premium-rwo"
+    size: "50Gi"
+    tmp_size: "20Gi"
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "2"
+      memory: "6Gi"
+    limits:
+      cpu: "2"
+      memory: "6Gi"
+
+pylon_indexer:
+  name_prefix: pylon-indexer
+  log_level: info
+
+  storage:
+    class: "premium-rwo"
+    size: "200Gi"  # adjust to match available storage space
+    tmp_size: "20Gi"
+
+  resources:
+    vpa_enabled: false
+    mode: "Off" # "Off" | "Auto" | "Initial" | "Recreate" | "InPlace" | "InPlaceOrRecreate"
+    requests:
+      cpu: "6"  # adjust to match available resources
+      memory: "20Gi"  # adjust to match available resources
+    limits:
+      cpu: "6"  # adjust to match available resources
+      memory: "20Gi"  # adjust to match available resources
+
+internal_repo:
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+
+redis:
+  name_prefix: "redis"
+  max_memory: "450mb"
+  maxmemory_policy: "allkeys-lru"
+  port: 6379
+
+  persistence:
+    size: 1Gi
+    accessMode: ReadWriteOnce
+    storageClass: "premium-rwo"
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "1"
+      memory: "512Mi"
+    limits:
+      cpu: "2"
+      memory: "512Mi"
+
+postgresql:
+  name_prefix: "pg"
+  port: 5432
+
+  persistence:
+    size: 250Gi # <- 250Gi recomended
+    accessMode: ReadWriteOnce
+    storageClass: "premium-rwo"
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+
+    tmpfs:
+      enabled: true
+      size: 2Gi
+
+    requests:
+      cpu: "4"
+      memory: "28Gi"
+    limits:
+      cpu: "4"
+      memory: "28Gi"
+
+#### deepwiki
+pylon_deepwiki:
+  enabled: false
+  log_level: info
+  name_prefix: pylon-deepwiki
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "1"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+  storage:
+    class: "premium-rwo"
+    size: "50Gi"
+    tmp_size: "30Gi"
+
+  configs:
+    basePath: /data/wiki_builder
+    version: "main"
+
+    # Autoregistration with AI/Run platform (optional)
+    aiRunPlatform:
+      token: ""         # Bearer token for authentication
+      verify: false     # Verify SSL certificates
+      timeout: 120      # HTTP timeout (seconds) for registration request
+      delay: 15          # Delay (seconds) before registration attempt
+      project_id: 1
+
+  jobs:
+    enabled: true  # Set to true to enable Jobs-based scaling
+    # Maximum concurrent Jobs cluster-wide
+    maxConcurrentJobs: 3
+    # TTL for completed Jobs (seconds)
+    # Jobs are auto-deleted after this time to prevent accumulation
+    ttlSecondsAfterFinished: 300
+  
+    # Job resource configuration
+    resources:
+      requests:
+        cpu: "2"
+        memory: "2Gi"
+
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+
+#### imagegen
+pylon_imagegen:
+  enabled: false
+  log_level: info
+  name_prefix: pylon-imagegen
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "200m"
+      memory: "128Mi"
+    limits:
+      cpu: "1"
+      memory: "256Mi"
+
+  storage:
+    class: "premium-rwo"
+    size: "50Gi"
+    tmp_size: "30Gi"
+
+  configs:
+
+    aiRunPlatform:
+      # JWT token for registration (consider using --set at install time to avoid committing)
+      token: ""
+      # Default bucket for storing generated images (overridable per-request)
+      verify: false     # Verify SSL certificates
+      timeout: 120      # HTTP timeout (seconds) for registration request
+      delay: 15          # Delay (seconds) before registration attempt
+      project_id: 1
+    imageBucket: "imagelibrary"
+
+#---- Inventory ----#
+pylon_inventory:
+  enabled: false
+  name_prefix: pylon-inventory
+  log_level: info
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+  storage:
+    class: "premium-rwo"
+    size: "50Gi"
+    tmp_size: "30Gi"
+
+  configs:
+    basePath: /data/inventory
+    version: "main"
+    aiRunPlatform:
+      token: "" #  should be empty
+      # Default bucket for storing generated images (overridable per-request)
+      verify: false     # Verify SSL certificates
+      timeout: 120      # HTTP timeout (seconds) for registration request
+      delay: 15          # Delay (seconds) before registration attempt
+      project_id: 2
+
+  jobs:
+    enabled: true  # Set to true to enable Jobs-based scaling
+    # Maximum concurrent Jobs cluster-wide
+    maxConcurrentJobs: 3
+    # TTL for completed Jobs (seconds)
+    # Jobs are auto-deleted after this time to prevent accumulation
+    ttlSecondsAfterFinished: 300
+
+    # Job resource configuration
+    resources:
+      requests:
+        cpu: "2"
+        memory: "2Gi"
+
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+
+#---- Otel Collector ----#
+
+otel_collector:
+  enabled: false
+  name_prefix: otel-collector
+  # GCP Service Account email for Workload Identity (must have roles/monitoring.metricWriter)
+  # e.g. "otel-collector@<project>.iam.gserviceaccount.com"
+  gsa: "otel-collector@serviceaccount"
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+#---- MCPs ----#
+
+#---- MCP Grafana ----#
+
+# our mcp address is http://mcp-grafana-svc.<namespace>.svc.cluster.local:8000/mcp
+mcp_grafana:
+  enabled: false
+  name_prefix: mcp-grafana
+  image_pull_policy: Always
+  replicas: 1
+
+  grafana:
+    # for k8s "http://<svc>.<namespace>.svc.cluster.local:80"
+    url: "http://monitoring-grafana.monitoring.svc.cluster.local:80"
+    org_id: "1"
+    extra_headers: ""
+    token_secret_key: ""
+
+  mcp:
+    transport: streamable-http
+    address: ":8000"
+    endpoint_path: /mcp
+    # Disables Host validation. Keep this only for an internal ClusterIP endpoint
+    # or when a trusted reverse proxy validates and rewrites the Host header.
+    allowed_hosts: "*"
+    allowed_origins: ""
+    log_level: info
+    disable_write: true
+    additional_args: []
+
+  service:
+    port: 8000
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# our mcp address is http://mcp-ado-svc.test.svc.cluster.local:3000/mcp
+mcp_ado:
+  enabled: false
+  name_prefix: mcp-ado
+  image_pull_policy: Always
+  replicas: 1
+
+  ado:
+    organization: ""
+    authentication: pat
+    personal_access_token: ""
+    legacy_api_key_enabled: true
+    mcp_api_key: ""
+    multiple_api_keys:
+      enabled: true
+      values:
+        user1: ""
+        user2: ""
+
+  mcp:
+    transport: http
+    host: 0.0.0.0
+    port: 3000
+    allowed_hosts: []
+    additional_args: []
+
+  cache:
+    enabled: true
+    mount_path: /home/node
+    size_limit: 10Mi
+
+  service:
+    port: 3000
+    annotations: {}
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "1"
+      memory: "512Mi"

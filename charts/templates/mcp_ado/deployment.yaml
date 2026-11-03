@@ -1,0 +1,129 @@
+---
+{{- if .Values.mcp_ado.enabled }}
+{{- $mcp := .Values.mcp_ado }}
+{{- $multipleApiKeysEnabled := $mcp.ado.multiple_api_keys.enabled }}
+{{- $legacyApiKeyEnabled := and $mcp.ado.legacy_api_key_enabled (not $multipleApiKeysEnabled) }}
+{{- if not (or $mcp.ado.legacy_api_key_enabled $mcp.ado.multiple_api_keys.enabled) }}
+{{- fail "at least one of mcp_ado.ado.legacy_api_key_enabled or mcp_ado.ado.multiple_api_keys.enabled must be true" }}
+{{- end }}
+{{- $serviceName := printf "%s-svc" $mcp.name_prefix }}
+{{- $allowedHosts := list $serviceName (printf "%s.%s" $serviceName .Release.Namespace) (printf "%s.%s.svc" $serviceName .Release.Namespace) (printf "%s.%s.svc.cluster.local" $serviceName .Release.Namespace) }}
+{{- range $mcp.mcp.allowed_hosts }}
+{{- $allowedHosts = append $allowedHosts . }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $mcp.name_prefix }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+    name: {{ $mcp.name_prefix }}
+    app.kubernetes.io/component: mcp-ado
+spec:
+  replicas: {{ $mcp.replicas }}
+  selector:
+    matchLabels:
+      name: {{ $mcp.name_prefix }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ toJson (dict "ado" $mcp.ado "mcp" $mcp.mcp) | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/mcp_ado/secret.yml") . | sha256sum }}
+      labels:
+        name: {{ $mcp.name_prefix }}
+        app.kubernetes.io/component: mcp-ado
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 33
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mcp-ado
+          image: {{ .Values.common.images.mcp_ado | quote }}
+          imagePullPolicy: {{ $mcp.image_pull_policy }}
+          args:
+            - {{ required "mcp_ado.ado.organization is required" $mcp.ado.organization | quote }}
+            - --transport
+            - {{ $mcp.mcp.transport | quote }}
+            - --host
+            - {{ $mcp.mcp.host | quote }}
+            - --port
+            - {{ $mcp.mcp.port | quote }}
+            - --authentication
+            - {{ $mcp.ado.authentication | quote }}
+            {{- with $mcp.mcp.additional_args }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            - name: PERSONAL_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $mcp.name_prefix }}-secret
+                  key: personal_access_token
+            {{- if $legacyApiKeyEnabled }}
+            - name: MCP_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $mcp.name_prefix }}-secret
+                  key: mcp_api_key
+            {{- end }}
+            {{- if $multipleApiKeysEnabled }}
+            - name: MCP_API_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $mcp.name_prefix }}-secret
+                  key: mcp_api_keys
+            {{- end }}
+            - name: MCP_ALLOWED_HOSTS
+              value: {{ join "," (uniq $allowedHosts) | quote }}
+          ports:
+            - name: http
+              containerPort: {{ $mcp.mcp.port }}
+              protocol: TCP
+          {{- if $mcp.cache.enabled }}
+          volumeMounts:
+            - name: home-cache
+              mountPath: {{ $mcp.cache.mount_path | quote }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ $serviceName | quote }}
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ $serviceName | quote }}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml $mcp.resources | nindent 12 }}
+      {{- if $mcp.cache.enabled }}
+      volumes:
+        - name: home-cache
+          emptyDir:
+            {{- with $mcp.cache.size_limit }}
+            sizeLimit: {{ . | quote }}
+            {{- end }}
+      {{- end }}
+{{- end }}

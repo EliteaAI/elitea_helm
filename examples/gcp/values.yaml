@@ -1,0 +1,37 @@
+# GKE (VPC-native) + External Secrets Operator (see externalsecret.yaml)
+#   helm install elitea oci://ghcr.io/<org>/charts/elitea --version <version> -n elitea -f values.yaml
+ingress_enabled: true
+cloud_ingress_type: gcp
+
+ingress:
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: elitea-ip          # gcloud compute addresses create elitea-ip --global
+    networking.gke.io/managed-certificates: elitea-cert             # see managedcertificate.yaml
+    kubernetes.io/ingress.allow-http: "false"
+
+common:
+  existingSecret: elitea-secrets          # created by externalsecret.yaml
+  config:
+    app_proto: https
+    app_host: elitea.example.com
+    cookies_secure: "true"
+
+# premium-rwo / standard-rwo are built-in GKE StorageClasses
+pylon_main:
+  storage: {class: premium-rwo, size: 50Gi, tmp_size: 20Gi}
+pylon_auth:
+  storage: {class: premium-rwo, size: 1Gi}
+pylon_indexer:
+  storage: {class: premium-rwo, size: 50Gi, tmp_size: 20Gi}
+postgresql:
+  persistence: {storageClass: premium-rwo, size: 100Gi}
+redis:
+  persistence: {storageClass: premium-rwo, size: 1Gi}
+
+# Managed services instead of embedded ones (Cloud SQL + Memorystore):
+# embedded_services_pgsql: false
+# embedded_services_redis: false
+# common:
+#   config:
+#     postgres_host: 10.0.0.5
+#     redis_host: 10.0.0.6

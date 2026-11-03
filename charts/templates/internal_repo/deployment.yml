@@ -1,0 +1,97 @@
+{{- if eq .Values.common.elitea_repo_type "internal" }}
+{{- $pre := .Values.common.name_prefix -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: internal-repo
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+    name: internal-repo
+spec:
+  selector:
+    matchLabels:
+      name: internal-repo
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+      labels:
+        name: internal-repo
+    spec:
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 33
+        runAsGroup: 33
+        seccompProfile:
+          type: RuntimeDefault
+
+      volumes:
+
+        {{- if .Values.external_ca_enabled }}
+        - name: internal-repo-cacerts
+          configMap:
+            name: {{ required "external_ca_configmap is required when external_ca_enabled" .Values.external_ca_configmap }}
+        {{- end }}
+
+        - name: {{ $pre }}-internal-tmp
+          emptyDir: {}
+
+      containers:
+        - name: internal-repo
+          image: {{ .Values.common.images.internal_repo }}
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 8080
+
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+          volumeMounts:
+            {{- if .Values.external_ca_enabled }}
+            - name: internal-repo-cacerts
+              mountPath: /cacerts
+              readOnly: true
+            {{- end }}
+
+            - name: {{ $pre }}-internal-tmp
+              mountPath: /tmp
+
+          resources:
+            requests:
+              cpu: "{{ .Values.internal_repo.resources.requests.cpu }}"
+              memory: "{{ .Values.internal_repo.resources.requests.memory }}"
+            limits:
+              cpu: "{{ .Values.internal_repo.resources.limits.cpu }}"
+              memory: "{{ .Values.internal_repo.resources.limits.memory }}"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+{{- end }}

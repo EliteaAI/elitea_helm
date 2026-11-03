@@ -1,0 +1,92 @@
+---
+{{- if .Values.otel_collector.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.otel_collector.name_prefix }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+    app: {{ .Values.otel_collector.name_prefix }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/otel_collector/config.yml") . | sha256sum }}
+      labels:
+        app: otel-collector
+    spec:
+      serviceAccountName: {{ .Values.otel_collector.name_prefix }}
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 33
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: otel-config
+          configMap:
+            name: {{ .Values.otel_collector.name_prefix }}-config
+      initContainers:
+        - name: wait-auth
+          image: {{ .Values.common.images.curl }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - |
+              set -e
+              AUTH_SVC="{{ printf "%s-svc.%s.svc.cluster.local" .Values.pylon_auth.name_prefix .Release.Namespace }}"
+              HEALTH="http://${AUTH_SVC}:8080/healthz"
+              echo "Waiting for pylon_auth health at ${HEALTH} ..."
+              until curl -fsS --max-time 5 "$HEALTH" >/dev/null; do
+                sleep 3
+              done
+      containers:
+        - name: otel-collector
+          image: {{ .Values.common.images.otel_collector }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          args:
+            - "--config"
+            - "/etc/otel/config.yml"
+            - "--feature-gates=exporter.googlemanagedprometheus.intToDouble"
+
+          env:
+            - name: DEPLOYMENT_ENVIRONMENT
+              value: {{ .Release.Namespace | quote }}
+
+          volumeMounts:
+            - name: otel-config
+              mountPath: /etc/otel/
+
+          resources:
+            requests:
+              cpu: {{ .Values.otel_collector.resources.requests.cpu | quote }}
+              memory: {{ .Values.otel_collector.resources.requests.memory | quote }}
+            limits:
+              memory: {{ .Values.otel_collector.resources.limits.memory | quote }}
+{{- end }}

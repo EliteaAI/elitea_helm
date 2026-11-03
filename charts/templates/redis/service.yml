@@ -1,0 +1,20 @@
+---
+{{- $embedded_redis := or (.Values.embedded_services_redis | default false) -}}
+{{- if $embedded_redis }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.redis.name_prefix }}-svc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elitea.labels.common" $ | nindent 4 }}
+    app.kubernetes.io/name: redis
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: {{ .Values.common.config.redis_port }}
+      targetPort: {{ .Values.common.config.redis_port }}
+  selector:
+    app.kubernetes.io/component: {{ .Values.redis.name_prefix }}
+{{- end }}

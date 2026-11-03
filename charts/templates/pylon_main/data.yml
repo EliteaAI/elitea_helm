@@ -1,0 +1,27 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: {{ .Values.pylon_main.name_prefix }}-data
+  namespace: {{ .Release.Namespace }}
+data:
+{{- $files := .Files.Glob "data/configs/pylon_main/*.yml" -}}
+{{- if $files }}
+{{ $files.AsConfig | nindent 2 }}
+{{- end }}
+  pylon.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_main/pylon.yml.tpl") . | nindent 4 }}
+  bootstrap.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_main/bootstrap.yml.tpl") . | nindent 4 }}
+  elitea_core.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_main/elitea_core.yml.tpl") . | nindent 4 }}
+  shared.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_main/shared.yml.tpl") . | nindent 4 }}
+  tracing.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_main/tracing.yml.tpl") . | nindent 4 }}
+  worker_client.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_main/worker_client.yml.tpl") . | nindent 4 }}
+  logging_hub.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_main/logging_hub.yml.tpl") . | nindent 4 }}

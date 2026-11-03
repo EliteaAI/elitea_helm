@@ -1,0 +1,39 @@
+# AKS + Application Gateway Ingress Controller + External Secrets Operator (see externalsecret.yaml)
+#   helm install elitea oci://ghcr.io/<org>/charts/elitea --version <version> -n elitea -f values.yaml
+ingress_enabled: true
+cloud_ingress_type: azure
+
+ingress:
+  annotations:
+    appgw.ingress.kubernetes.io/appgw-ssl-certificate: elitea-cert    # certificate name configured on the Application Gateway
+    appgw.ingress.kubernetes.io/ssl-redirect: "true"
+    # appgw.ingress.kubernetes.io/waf-policy-for-path: /subscriptions/.../applicationGatewayWebApplicationFirewallPolicies/...
+
+common:
+  existingSecret: elitea-secrets          # created by externalsecret.yaml
+  config:
+    app_proto: https
+    app_host: elitea.example.com
+    cookies_secure: "true"
+
+# managed-csi-premium is a built-in AKS StorageClass (Premium SSD); managed-csi is the standard one
+pylon_main:
+  storage: {class: managed-csi-premium, size: 50Gi, tmp_size: 20Gi}
+pylon_auth:
+  storage: {class: managed-csi-premium, size: 1Gi}
+pylon_indexer:
+  storage: {class: managed-csi-premium, size: 50Gi, tmp_size: 20Gi}
+postgresql:
+  persistence: {storageClass: managed-csi-premium, size: 100Gi}
+redis:
+  persistence: {storageClass: managed-csi-premium, size: 1Gi}
+
+# Managed services instead of embedded ones (Azure Database for PostgreSQL + Azure Cache for Redis):
+# embedded_services_pgsql: false
+# embedded_services_redis: false
+# common:
+#   config:
+#     postgres_host: mydb.postgres.database.azure.com
+#     redis_host: my-redis.redis.cache.windows.net
+#     redis_port: "6380"
+#     redis_ssl: "true"

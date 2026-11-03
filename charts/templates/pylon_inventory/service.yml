@@ -1,0 +1,19 @@
+---
+{{- if .Values.pylon_inventory.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.pylon_inventory.name_prefix }}-svc
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+spec:
+  selector:
+    name: {{ .Values.pylon_inventory.name_prefix }}
+
+  ports:
+    - name: {{ .Values.pylon_inventory.name_prefix }}
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+{{- end}}

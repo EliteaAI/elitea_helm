@@ -1,0 +1,24 @@
+---
+{{- if and (.Values.pylon_deepwiki.enabled) (.Values.pylon_deepwiki.jobs.enabled) }}
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: {{ .Values.pylon_deepwiki.name_prefix }}-job-manager
+  namespace: {{ .Release.Namespace }}
+
+rules:
+  # Create, list, get, delete Jobs for wiki generation
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  # Access pods for log streaming
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+{{- end }}

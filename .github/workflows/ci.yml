@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+# Runner: repository variable RUNNER_LABELS, e.g. ["self-hosted","linux","x64"]; GitHub-hosted if unset.
+# The self-hosted image has curl, git, jq, trivy, grype but no helm: it is installed by setup-helm below.
+# Fork PRs never run on it: untrusted code must not reach a self-hosted runner.
+jobs:
+  lint:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Lint (strict, dummy secrets)
+        run: helm lint charts --strict -f charts/ci/test-values.yaml
+
+      - name: Render defaults and every example
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          helm template elitea charts -n elitea -f charts/ci/test-values.yaml > build/default.yaml
+          for f in examples/*/values.yaml; do
+            name=$(basename "$(dirname "$f")")
+            extra=()
+            # examples without existingSecret need the 4 encryption keys
+            grep -q '^  existingSecret:' "$f" || extra=(-f charts/ci/test-values.yaml)
+            helm template elitea charts -n elitea "${extra[@]}" -f "$f" > "build/$name.yaml"
+            echo "rendered $f"
+          done
+
+      - name: Render with every optional component and each cloud load balancer
+        run: |
+          set -euo pipefail
+          for cloud in gcp aws azure; do
+            helm template elitea charts -n elitea -f charts/ci/test-values.yaml \
+              --set ingress_enabled=true --set cloud_ingress_type=$cloud \
+              --set pylon_imagegen.enabled=true --set pylon_deepwiki.enabled=true \
+              --set pylon_inventory.enabled=true --set otel_collector.enabled=true \
+              --set common.elitea_repo_type=internal \
+              --set external_ca_enabled=true --set external_ca_configmap=cas --set 'external_ca_files={ca.crt}' \
+              > "build/full-$cloud.yaml"
+          done
+
+      - name: Validate manifests (kubeconform)
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz -C "$RUNNER_TEMP" kubeconform
+          "$RUNNER_TEMP/kubeconform" -strict -summary -ignore-missing-schemas -kubernetes-version 1.30.0 build/*.yaml
+
+      - name: Trivy misconfiguration scan
+        run: trivy config build --ignorefile .trivyignore.yaml --severity MEDIUM,HIGH,CRITICAL --exit-code 1
+
+      - name: Required secrets are enforced
+        run: |
+          if helm template elitea charts >/dev/null 2>&1; then
+            echo "chart rendered without required secrets"; exit 1
+          fi
+
+  secret-scan:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy secret scan
+        run: |
+          command -v trivy >/dev/null || curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b "$RUNNER_TEMP"
+          export PATH="$RUNNER_TEMP:$PATH"
+          trivy fs --scanners secret --exit-code 1 .
+
+  commits:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Conventional commits
+        run: |
+          pip install commitizen
+          cz check --rev-range "origin/${{ github.base_ref }}..HEAD"

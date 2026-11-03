@@ -1,0 +1,20 @@
+---
+misconfigurations:
+  # Global ignores
+  - id: AVD-KSV-0125
+    statement: "Using private/internal registries (ECR, GCR, etc.), not considering them untrusted"
+
+  - id: AVD-KSV-0020
+    statement: "runAsGroup > 10000 is acceptable in our case (no conflicts with host)"
+
+  - id: AVD-KSV-0021
+    statement: "runAsGroup <= 10000 is acceptable in our case (no conflicts with host)"
+
+  - id: AVD-KSV-01010
+    statement: "ConfigMap contains sensitive data, but this is intentional (alternative — Secret)"
+
+  - id: AVD-KSV-0109
+    statement: "ConfigMap is used for configuration with secrets when necessary"
+
+  - id: AVD-KSV-0048
+    statement: "Role requires job create for wiki generation workers"

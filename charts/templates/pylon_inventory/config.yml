@@ -1,0 +1,47 @@
+---
+{{- $embedded_redis := (.Values.embedded_services_redis | default false)  -}}
+{{- $embedded_pgsql := (.Values.embedded_services_pgsql | default false)  -}}
+
+{{- /* make map */ -}}
+{{- $cfg := dict -}}
+{{- range $k, $v := .Values.common.config }}
+  {{- $_ := set $cfg $k $v -}}
+{{- end }}
+{{- range $k, $v := .Values.pylon_inventory.config }}
+  {{- $_ := set $cfg $k $v -}}
+{{- end }}
+
+{{- if $embedded_redis }}
+  {{- $_ := set $cfg "redis_host" (printf "%s-svc" .Values.redis.name_prefix) -}}
+  {{- $_ := set $cfg "redis_port" (printf "%v" .Values.common.config.redis_port) -}}
+  {{- $_ := set $cfg "redis_ssl" "false" -}}
+{{- end }}
+
+{{- if $embedded_pgsql }}
+  {{- $_ := set $cfg "postgres_host" (printf "%s-svc" .Values.postgresql.name_prefix) -}}
+  {{- $_ := set $cfg "postgres_port" (printf "%v" .Values.common.config.postgres_port) -}}
+{{- end }}
+
+{{- if (.Values.pgbouncer_enabled | default false) }}
+  {{- $_ := set $cfg "postgres_host" (printf "%s-svc" .Values.pgbouncer.name_prefix) -}}
+  {{- $_ := set $cfg "postgres_port" (printf "%v" .Values.pgbouncer.port) -}}
+{{- end }}
+#
+{{- if .Values.pylon_inventory.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.pylon_inventory.name_prefix }}-config
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+data:
+  {{- $keys := keys $cfg | sortAlpha -}}
+  {{- if $keys }}
+  {{- range $k := $keys }}
+  {{ $k }}: {{ index $cfg $k | quote }}
+  {{- end }}
+  {{- else }}
+  {}
+  {{- end }}
+{{- end }}

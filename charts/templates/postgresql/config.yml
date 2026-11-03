@@ -1,0 +1,48 @@
+---
+{{- $embedded_pgsql := (.Values.embedded_services_pgsql | default false) -}}
+{{- if $embedded_pgsql }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: {{ .Values.postgresql.name_prefix }}-config
+  namespace: {{ .Release.Namespace }}
+data:
+  postgresql.conf: |
+    listen_addresses = '*'
+    port = {{ .Values.common.config.postgres_port }}
+    max_connections = 200
+    shared_buffers = 4GB
+    effective_cache_size = 12GB
+    maintenance_work_mem = 1GB
+    checkpoint_completion_target = 0.9
+    wal_buffers = 16MB
+    default_statistics_target = 100
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    work_mem = 16MB
+    huge_pages = try
+    jit = off
+    wal_compression = lz4
+    io_method = sync
+    min_wal_size = 1GB
+    max_wal_size = 4GB
+    max_worker_processes = 4
+    max_parallel_workers_per_gather = 2
+    max_parallel_workers = 4
+    max_parallel_maintenance_workers = 2
+    wal_level = replica
+    synchronous_commit = on
+    log_min_duration_statement = 500
+    log_connections = off
+    log_disconnections = off
+    log_line_prefix = '%t [%p]: [%l-1] %h %u %d '
+    include_dir = 'conf.d'
+  pg_hba.conf: |
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    local   all             all                                     trust
+    host    all             all             127.0.0.1/32            trust
+    host    all             all             ::1/128                 trust
+    host    all             all             0.0.0.0/0               scram-sha-256
+{{- end }}

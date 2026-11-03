@@ -1,0 +1,538 @@
+---
+{{- $pin  := .Values.pylon_inventory -}}
+{{- $cfg := .Files.Glob "data/configs/pylon_inventory/*.yml" -}}
+{{- $embedded_pgsql := (.Values.embedded_services_pgsql | default false) -}}
+{{- $embedded_redis := (.Values.embedded_services_redis | default false) -}}
+{{- $int_repo := eq (.Values.common.elitea_repo_type | default "standard") "internal" -}}
+{{- $no_init := not (or $embedded_pgsql $embedded_redis $int_repo) -}}
+{{- $hasPylonTpl := not (empty (.Files.Glob "data/configs/pylon_inventory/pylon.yml.tpl")) -}}
+{{- $hasBootstrapTpl := not (empty (.Files.Glob "data/configs/pylon_inventory/bootstrap.yml.tpl")) -}}
+{{- $hasinventoryTpl := not (empty (.Files.Glob "data/configs/pylon_inventory/inventory_plugin.yml.tpl")) -}}
+
+{{- if .Values.pylon_inventory.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $pin.name_prefix }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+    name: {{ $pin.name_prefix }}
+    app.kubernetes.io/component: combined
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: {{ $pin.name_prefix }}
+      app.kubernetes.io/component: combined
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/pylon_inventory/config.yml") . | sha256sum }}
+        checksum/data: {{ include (print $.Template.BasePath "/pylon_inventory/data.yml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/pylon_inventory/secret.yml") . | sha256sum }}
+      labels:
+        name: {{ $pin.name_prefix }}
+        app.kubernetes.io/component: combined
+    spec:
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
+      {{- if .Values.pylon_inventory.jobs.enabled }}
+      serviceAccountName: inventory-job-manager
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 33
+        seccompProfile:
+          type: RuntimeDefault
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $pin.name_prefix }}-storage
+
+        - name: {{ $pin.name_prefix }}-tmp-storage
+          persistentVolumeClaim:
+            claimName: {{ $pin.name_prefix }}-tmp-storage
+
+        {{- if or  $hasBootstrapTpl $hasinventoryTpl }}
+        - name: {{ $pin.name_prefix }}-configs-vol
+          configMap:
+            name: {{ $pin.name_prefix }}-data
+            items:
+              {{- range $path, $_ := $cfg }}
+              - key: {{ base $path }}
+                path: {{ base $path }}
+              {{- end }}
+              {{- end }}
+              {{- if $hasBootstrapTpl }}
+              - key: bootstrap.yml
+                path: bootstrap.yml
+              {{- end }}
+              {{- if $hasinventoryTpl }}
+              - key: inventory_plugin.yml
+                path: inventory_plugin.yml
+              {{- end }}
+
+        - name: {{ $pin.name_prefix }}-pylonyml-vol
+          configMap:
+            name: {{ $pin.name_prefix }}-data
+            items:
+              - key: pylon.yml
+                path: pylon.yml
+
+        {{- if .Values.external_ca_enabled }}
+        - name: {{ $pin.name_prefix }}-cacerts
+          configMap:
+            name: {{ required "external_ca_configmap is required when external_ca_enabled" .Values.external_ca_configmap }}
+        {{- end }}
+
+      {{- if $no_init }}
+      initContainers:
+      {{- else }}
+      initContainers:
+      {{- if $int_repo }}
+        - name: wait-for-internal-repo
+          image: {{ .Values.common.images.curl }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - |
+              set -e
+              REPO_HOST="elitea-internal-repo.{{ .Release.Namespace | quote }}.svc.cluster.local"
+              HEALTH="http://${REPO_HOST}:8080/healthz"
+              echo "Waiting for internal repo health at ${HEALTH} ..."
+              until curl -fsS --max-time 5 "$HEALTH" >/dev/null; do
+                sleep 3
+              done
+              # Waitin artefact
+              ART="http://${REPO_HOST}:8080/target/public/depot/{{ .Values.common.release }}/plugins/bootstrap/source"
+              echo "Waiting for artifact ${ART} ..."
+              until curl -fsSI "$ART" | grep -qE 'HTTP/.* 200'; do
+                sleep 5
+              done
+              echo "Internal repo is ready."
+      {{- end }}
+      {{- if $embedded_pgsql }}
+        - name: wait-postgres
+          image: {{ .Values.common.images.postgres }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - >
+              set -eu;
+              export PGPASSWORD="${POSTGRES_PASSWORD}";
+              H="${POSTGRES_HOST}";
+              P="${POSTGRES_PORT}";
+              U="${POSTGRES_USER}";
+              DB="${POSTGRES_DB}";
+              for i in $(seq 1 30); do
+                psql -h "$H" -p "$P" -U "$U" -d "$DB" -c '\q' >/dev/null 2>&1 && exit 0;
+                echo "waiting for postgres $H:$P (auth)..."; sleep 8;
+              done;
+              echo "postgres auth/connect failed" >&2; exit 1;
+          env:
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pin.name_prefix }}-config
+                  key: postgres_host
+
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pin.name_prefix }}-config
+                  key: postgres_port
+
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pin.name_prefix }}-config
+                  key: postgres_db
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pin.name_prefix) }}
+                  key: postgres_user
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pin.name_prefix) }}
+                  key: postgres_password
+                  optional: true
+      {{- end }}
+      {{- if $embedded_redis }}
+        - name: wait-redis
+          image: {{ .Values.common.images.redis }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 1000
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - >
+              set -eu;
+              H="${REDIS_HOST}";
+              P="${REDIS_PORT}";
+              SSL="${REDIS_SSL}";
+              PROTO="redis";
+              EXTRA="";
+              if [ "$SSL" = "true" ] || [ "$SSL" = "1" ]; then
+                PROTO="rediss"; EXTRA="--tls";
+              fi;
+              for i in $(seq 1 30); do
+                redis-cli $EXTRA -h "$H" -p "$P" -a ${REDIS_PASSWORD} PING 2>/dev/null | grep -q PONG && exit 0;
+                echo "waiting for redis $PROTO://$H:$P (auth)..."; sleep 7;
+              done;
+              echo "redis auth/connect failed" >&2; exit 1;
+          env:
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pin.name_prefix }}-config
+                  key: redis_host
+                  optional: true
+
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pin.name_prefix }}-config
+                  key: redis_port
+                  optional: true
+
+            - name: REDIS_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pin.name_prefix }}-config
+                  key: redis_ssl
+                  optional: true
+
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pin.name_prefix) }}
+                  key: redis_password
+                  optional: true
+      {{- end }}
+      {{- end }}
+        - name: wait-main
+          image: {{ .Values.common.images.curl }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - |
+              set -e
+              MAIN_SVC="{{ printf "%s-svc.%s.svc.cluster.local" .Values.pylon_main.name_prefix .Release.Namespace }}"
+              HEALTH="http://${MAIN_SVC}:8080/healthz"
+              echo "Waiting for pylon_main health at ${HEALTH} ..."
+              until curl -fsS --max-time 5 "$HEALTH" >/dev/null; do
+                sleep 3
+              done
+        - name: wait-indexer
+          image: {{ .Values.common.images.curl }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - |
+              set -e
+              MAIN_SVC="{{ printf "%s-svc.%s.svc.cluster.local" .Values.pylon_indexer.name_prefix .Release.Namespace }}"
+              HEALTH="http://${MAIN_SVC}:8080/healthz"
+              echo "Waiting for pylon_indexer health at ${HEALTH} ..."
+              until curl -fsS --max-time 5 "$HEALTH" >/dev/null; do
+                sleep 3
+              done
+        - name: refresh-plugins
+          image: {{ .Values.common.image }}
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Preparing for fresh plugin clone..."
+              mkdir -p /data/inventory/jobs 2>/dev/null || true
+              rm -rf /data/plugins/inventory_plugin /data/plugins/bootstrap 2>/dev/null || true
+              echo "Ready for fresh plugin clone on container start."
+
+          volumeMounts:
+            - name: data
+              mountPath: /data
+
+            - name: {{ $pin.name_prefix }}-tmp-storage
+              mountPath: /tmp
+
+      containers:
+        - name: {{ $pin.name_prefix }}
+          image: {{ .Values.common.image }}
+          imagePullPolicy: Always
+
+          env:
+          {{- if .Values.external_proxy_enabled }}
+
+            - name: http_proxy
+              value: "{{ .Values.http_proxy }}"
+
+            - name: HTTP_PROXY
+              value: "{{ .Values.http_proxy }}"
+
+            - name: https_proxy
+              value: "{{ .Values.https_proxy }}"
+
+            - name: HTTPS_PROXY
+              value: "{{ .Values.https_proxy }}"
+
+            - name: no_proxy
+              value: "{{ .Values.no_proxy }}"
+
+            - name: NO_PROXY
+              value: "{{ .Values.no_proxy }}"
+          {{- end }}
+
+            - name: APP_HOST
+              value: {{ printf "%s://%s" .Values.common.config.app_proto .Values.common.config.app_host | quote }}
+
+            - name: SERVICE_LOCATION_URL
+              value: {{ printf "http://%s-svc.%s.svc.cluster.local:8080" .Values.pylon_inventory.name_prefix .Release.Namespace | quote }}
+
+            - name: AI_RUN_PLATFORM_URL
+              value:  {{ printf "http://%s-svc.%s.svc.cluster.local:8080/api/v2/elitea_core/register_descriptor/%d" .Values.pylon_main.name_prefix .Release.Namespace (.Values.pylon_inventory.configs.aiRunPlatform.project_id | int) | quote }}
+
+            - name: AI_RUN_PLATFORM_TOKEN
+              value: {{ .Values.pylon_inventory.configs.aiRunPlatform.token | quote }}
+
+            - name: NAME
+              value: {{ $pin.name_prefix }}
+
+            - name: PYLON_WEB_RUNTIME
+              value: "gevent"
+
+            - name: PYLON_CONFIG_SEED
+              value: file:/data/pylon.yml
+
+            - name: COOKIES_SECURE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pin.name_prefix }}-config
+                  key: cookies_secure
+
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+            {{- if .Values.pylon_inventory.jobs.enabled }}
+
+            # K8s Jobs-based scaling configuration
+            - name: INVENTORY_JOBS_ENABLED
+              value: "true"
+
+            - name: INVENTORY_WORKER_SERVICE_ACCOUNT
+              value: inventory-worker
+
+            - name: INVENTORY_MAX_CONCURRENT_JOBS
+              value: {{ .Values.pylon_inventory.jobs.maxConcurrentJobs | quote }}
+
+            - name: INVENTORY_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+
+            - name: INVENTORY_JOB_TTL_SECONDS
+              value: {{ .Values.pylon_inventory.jobs.ttlSecondsAfterFinished | quote }}
+
+            - name: INVENTORY_WORKER_IMAGE
+              value: {{ .Values.common.images.inventory_worker | quote }}
+
+            - name: INVENTORY_WORKER_IMAGE_PULL_POLICY
+              value: IfNotPresent
+
+            - name: INVENTORY_JOB_MEMORY_REQUEST
+              value: {{ .Values.pylon_inventory.jobs.resources.requests.memory | quote }}
+
+            - name: INVENTORY_JOB_CPU_REQUEST
+              value: {{ .Values.pylon_inventory.jobs.resources.requests.cpu | quote }}
+
+            - name: INVENTORY_JOB_MEMORY_LIMIT
+              value: {{ .Values.pylon_inventory.jobs.resources.limits.memory | quote }}
+
+            - name: INVENTORY_JOB_CPU_LIMIT
+              value: {{ .Values.pylon_inventory.jobs.resources.limits.cpu | quote }}
+
+            - name: ELITEA_RELEASE
+              value: "{{ .Values.pylon_inventory.configs.version }}"
+            {{- end }}
+
+          ports:
+            - containerPort: 8080
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 12
+            failureThreshold: 75   # ~ 900 seconds startup time
+            timeoutSeconds: 4
+
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 5
+            successThreshold: 1
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+          volumeMounts:
+            - name: data
+              mountPath: /data
+
+            - name: {{ $pin.name_prefix }}-tmp-storage
+              mountPath: /tmp
+
+            - name: {{ $pin.name_prefix }}-configs-vol
+              mountPath: /data/configs
+              readOnly: true
+
+            - name: {{ $pin.name_prefix }}-pylonyml-vol
+              mountPath: /data/pylon.yml
+              subPath: pylon.yml
+              readOnly: true
+
+            {{- if .Values.external_ca_enabled }}
+            - name: {{ $pin.name_prefix }}-cacerts
+              mountPath: /cacerts
+              readOnly: true
+            {{- end }}
+
+          resources:
+            requests:
+              cpu: "{{ .Values.pylon_inventory.resources.requests.cpu }}"
+              memory: "{{ .Values.pylon_inventory.resources.requests.memory }}"
+            limits:
+              memory: "{{ .Values.pylon_inventory.resources.limits.memory }}"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL
+{{- end }}

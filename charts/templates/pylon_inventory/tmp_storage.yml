@@ -1,0 +1,20 @@
+---
+{{- if .Values.pylon_inventory.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+
+metadata:
+  name: {{ .Values.pylon_inventory.name_prefix }}-tmp-storage
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.pylon_inventory.storage.class }}
+
+  resources:
+    requests:
+      storage: "{{ .Values.pylon_inventory.storage.tmp_size }}"
+{{- end }}

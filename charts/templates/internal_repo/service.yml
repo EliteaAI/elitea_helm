@@ -1,0 +1,20 @@
+---
+{{- if eq .Values.common.elitea_repo_type "internal" }}
+apiVersion: v1
+kind: Service
+
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: internal-repo-svc
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  selector:
+    name: internal-repo
+
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+{{- end }}

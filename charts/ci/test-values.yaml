@@ -1,0 +1,9 @@
+# Dummy secrets so `make lint` / `make template` work on defaults. Never use for a real install.
+common:
+  secrets:
+    auth:
+      application_auth_secret_key: ci
+      default_admin_password: ci
+    main:
+      application_main_secret_key: ci
+      secrets_master_key: ci

@@ -1,0 +1,32 @@
+{{- $pd  := .Values.pylon_deepwiki -}}
+
+---
+{{- if and (.Values.pylon_deepwiki.resources.vpa_enabled) (.Values.pylon_deepwiki.enabled) }}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ $pd.name_prefix }}-vpa
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $pd.name_prefix }}
+  updatePolicy:
+    updateMode: {{ .Values.pylon_deepwiki.resources.mode }}
+  resourcePolicy:
+    containerPolicies:
+      - containerName: {{ $pd.name_prefix }}
+        minAllowed:
+          cpu: "200m"
+          memory: "1Gi"
+        maxAllowed:
+          cpu: "4"
+          memory: "4Gi"
+        controlledResources:
+          - cpu
+          - memory
+{{- end }}

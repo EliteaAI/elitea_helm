@@ -1,0 +1,20 @@
+---
+{{- $embedded_pgsql := or (.Values.embedded_services_pgsql | default false) (.Values.embedde_services | default false) -}}
+{{- if $embedded_pgsql }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: {{ .Values.postgresql.name_prefix }}-storage
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - {{ .Values.postgresql.persistence.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.postgresql.persistence.storageClass }}
+  storageClassName: {{ .Values.postgresql.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.persistence.size | default "20Gi" }}
+{{- end }}

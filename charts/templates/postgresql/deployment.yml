@@ -1,0 +1,166 @@
+---
+{{- $embedded_pgsql := (.Values.embedded_services_pgsql | default false) -}}
+{{- if $embedded_pgsql }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.postgresql.name_prefix }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elitea.labels.common" $ | nindent 4 }}
+    app.kubernetes.io/name: postgresql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/component: {{ .Values.postgresql.name_prefix }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/postgresql/config.yml") . | sha256sum }}
+        checksum/config-init: {{ include (print $.Template.BasePath "/postgresql/config-init.yml") . | sha256sum }}
+      labels:
+        app.kubernetes.io/name: postgresql
+        app.kubernetes.io/component: {{ .Values.postgresql.name_prefix }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: postgres
+          image: {{ .Values.common.images.postgres }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.common.config.postgres_db | default "eliteadb" | quote }}
+
+            - name: PGDATA
+              value: "/data/pgdata"
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" .Values.postgresql.name_prefix) }}
+                  key: postgres_user
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" .Values.postgresql.name_prefix) }}
+                  key: postgres_password
+
+            - name: POSTGRES_PORT
+              value: "{{ .Values.postgresql.port }}"
+          ports:
+            - name: pgsql
+              containerPort: {{ .Values.postgresql.port }}
+          args:
+            - "-c"
+            - "config_file=/etc/postgresql/postgresql.conf"
+            - "-c"
+            - "max_connections=1000"
+
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -h 127.0.0.1 -p \"$POSTGRES_PORT\""
+            initialDelaySeconds: 20
+            periodSeconds: 10
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "pg_isready -U \"$POSTGRES_USER\" -h 127.0.0.1 -p \"$POSTGRES_PORT\" -d \"$POSTGRES_DB\""
+            initialDelaySeconds: 30
+            periodSeconds: 20
+
+          volumeMounts:
+            {{- if .Values.postgresql.resources.tmpfs.enabled }}
+            - name: dshm
+              mountPath: /dev/shm
+            {{- end }}
+            - name: data
+              mountPath: /data
+
+            - name: tmp
+              mountPath: /tmp
+
+            - name: run
+              mountPath: /var/run/postgresql
+
+            - name: conf
+              mountPath: /etc/postgresql
+              readOnly: true
+
+            - name: confd
+              mountPath: /etc/postgresql/conf.d
+              readOnly: true
+
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: {{ .Values.postgresql.resources.requests.cpu | quote }}
+              memory: {{ .Values.postgresql.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.postgresql.resources.limits.cpu | quote }}
+              memory: {{ .Values.postgresql.resources.limits.memory | quote }}
+
+      volumes:
+        {{- if .Values.postgresql.resources.tmpfs.enabled }}
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.postgresql.resources.tmpfs.size | quote }}
+        {{- end }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.postgresql.name_prefix }}-storage
+
+        - name: tmp
+          emptyDir: {}
+
+        - name: run
+          emptyDir: {}
+
+        - name: conf
+          configMap:
+            name: {{ .Values.postgresql.name_prefix }}-config
+            items:
+              - key: postgresql.conf
+                path: postgresql.conf
+
+        - name: confd
+          configMap:
+            name: {{ .Values.postgresql.name_prefix }}-config
+            items:
+              - key: pg_hba.conf
+                path: conf.d/pg_hba.conf
+
+        - name: initdb
+          configMap:
+            name: {{ .Values.postgresql.name_prefix }}-init
+            items:
+              - key: init.sql
+                path: init.sql
+{{- end }}

@@ -1,0 +1,45 @@
+name: Release
+
+# Push a tag equal to the chart version: git tag v2.0.8 && git push origin v2.0.8
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # GitHub Release
+  packages: write   # ghcr.io
+
+jobs:
+  release:
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Tag must match Chart.yaml version
+        id: ver
+        run: |
+          version=$(sed -n 's/^version: *//p' charts/Chart.yaml | tr -d '"')
+          [ "v$version" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} != chart version v$version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Lint
+        run: helm lint charts --strict -f charts/ci/test-values.yaml
+
+      - name: Package
+        run: helm package charts -d dist
+
+      - name: Push to ghcr.io (OCI)
+        run: |
+          owner=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm push "dist/elitea-${{ steps.ver.outputs.version }}.tgz" "oci://ghcr.io/${owner}/charts"
+
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" "dist/elitea-${{ steps.ver.outputs.version }}.tgz" \
+            --title "elitea ${{ steps.ver.outputs.version }}" --generate-notes

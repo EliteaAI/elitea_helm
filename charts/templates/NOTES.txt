@@ -1,0 +1,25 @@
+EliteA {{ .Chart.AppVersion }} installed as "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+{{- if .Values.ingress_enabled }}
+
+Load balancer ({{ .Values.cloud_ingress_type }}): it can take a few minutes to get an address.
+  kubectl -n {{ .Release.Namespace }} get ingress
+Point DNS for {{ .Values.common.config.app_host }} to that address.
+{{- else }}
+
+Ingress is disabled. To reach the UI locally:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ .Values.pylon_main.name_prefix }}-svc 8080:8080
+  http://localhost:8080
+{{- end }}
+
+Check pods:
+  kubectl -n {{ .Release.Namespace }} get pods
+
+Admin password: common.secrets.auth.default_admin_password (or the default_admin_password key of common.existingSecret).
+IMPORTANT: never change the common.secrets.auth/main keys after the first install.
+{{- if and .Values.hmac_auto_generate }}
+
+hmac_auto_generate is on: keys are generated once and reused on upgrade (needs cluster access).
+With Argo CD / "helm template" set hmac_auto_generate=false and the embedded
+postgres/redis passwords explicitly, otherwise they change on every render.
+{{- end }}

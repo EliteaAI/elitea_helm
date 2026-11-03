@@ -1,0 +1,37 @@
+# Local trial on minikube / kind / Docker Desktop: embedded PostgreSQL and Redis, no ingress, small resources.
+# Not for production. Start with: ./install.sh   (creates the secrets and installs the chart)
+#
+# Cluster size: minikube start --cpus 6 --memory 16g --disk-size 60g
+ingress_enabled: false
+
+common:
+  existingSecret: elitea-secrets          # created by install.sh
+  config:
+    app_proto: http
+    app_host: localhost
+    cookies_secure: "false"
+
+# `standard` is the default minikube StorageClass (kind too); sizes are small on purpose
+pylon_main:
+  storage: {class: standard, size: 10Gi, tmp_size: 5Gi}
+  resources:
+    requests: {cpu: 500m, memory: 2Gi}
+    limits: {cpu: "2", memory: 4Gi}
+pylon_auth:
+  storage: {class: standard, size: 1Gi}
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 1Gi}
+pylon_indexer:
+  storage: {class: standard, size: 10Gi, tmp_size: 5Gi}
+  resources:
+    requests: {cpu: 500m, memory: 2Gi}
+    limits: {cpu: "2", memory: 4Gi}
+postgresql:
+  persistence: {storageClass: standard, size: 10Gi}
+  resources:
+    tmpfs: {enabled: true, size: 512Mi}
+    requests: {cpu: 250m, memory: 1Gi}
+    limits: {cpu: "1", memory: 2Gi}
+redis:
+  persistence: {storageClass: standard, size: 1Gi}

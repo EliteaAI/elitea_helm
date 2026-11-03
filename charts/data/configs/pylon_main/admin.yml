@@ -1,0 +1,9 @@
+---
+theme_index_is_project_mode: false
+
+plugins:
+  available:
+    - configuration
+    - models
+
+reload_enabled: false

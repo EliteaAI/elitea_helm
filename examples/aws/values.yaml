@@ -1,0 +1,41 @@
+# EKS + AWS Load Balancer Controller + External Secrets Operator (see externalsecret.yaml)
+#   helm install elitea oci://ghcr.io/<org>/charts/elitea --version <version> -n elitea -f values.yaml
+ingress_enabled: true
+cloud_ingress_type: aws
+
+ingress:
+  annotations:
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-central-1:111122223333:certificate/REPLACE_ME
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    # alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:...
+    # alb.ingress.kubernetes.io/inbound-cidrs: 10.0.0.0/8      # restrict access
+
+common:
+  existingSecret: elitea-secrets          # created by externalsecret.yaml
+  config:
+    app_proto: https
+    app_host: elitea.example.com
+    cookies_secure: "true"
+
+# gp3 StorageClass (EBS CSI driver); sizes are a starting point
+pylon_main:
+  storage: {class: gp3, size: 50Gi, tmp_size: 20Gi}
+pylon_auth:
+  storage: {class: gp3, size: 1Gi}
+pylon_indexer:
+  storage: {class: gp3, size: 50Gi, tmp_size: 20Gi}
+postgresql:
+  persistence: {storageClass: gp3, size: 100Gi}
+redis:
+  persistence: {storageClass: gp3, size: 1Gi}
+
+# Managed services instead of embedded ones (RDS + ElastiCache):
+# embedded_services_pgsql: false
+# embedded_services_redis: false
+# redis_aws_cloud: true
+# common:
+#   config:
+#     postgres_host: mydb.cluster-xyz.eu-central-1.rds.amazonaws.com
+#     redis_host: my-redis.xyz.cache.amazonaws.com
+#     redis_ssl: "true"

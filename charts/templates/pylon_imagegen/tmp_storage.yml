@@ -1,0 +1,20 @@
+---
+{{- if .Values.pylon_imagegen.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: {{ .Values.pylon_imagegen.name_prefix }}-tmp-storage
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.pylon_imagegen.storage.class }}
+
+  resources:
+    requests:
+      storage: "{{ .Values.pylon_imagegen.storage.tmp_size }}"
+{{- end }}

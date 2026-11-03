@@ -1,0 +1,32 @@
+{{- $pg  := .Values.pylon_imagegen -}}
+
+---
+{{- if and (.Values.pylon_imagegen.resources.vpa_enabled) (.Values.pylon_imagegen.enabled) }}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ $pg.name_prefix }}-vpa
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $pg.name_prefix }}
+  updatePolicy:
+    updateMode: {{ .Values.pylon_imagegen.resources.mode }}
+  resourcePolicy:
+    containerPolicies:
+      - containerName: {{ $pg.name_prefix }}
+        minAllowed:
+          cpu: "100m"
+          memory: "128Mi"
+        maxAllowed:
+          cpu: "500m"
+          memory: "512Mi"
+        controlledResources:
+          - cpu
+          - memory
+{{- end }}

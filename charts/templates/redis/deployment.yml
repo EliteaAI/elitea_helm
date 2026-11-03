@@ -1,0 +1,107 @@
+---
+{{- $embedded_redis := (.Values.embedded_services_redis | default false) -}}
+{{- if $embedded_redis }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.redis.name_prefix }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elitea.labels.common" $ | nindent 4 }}
+    app.kubernetes.io/name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/component: {{ .Values.redis.name_prefix }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/redis/config.yml") . | sha256sum }}
+      labels:
+        app.kubernetes.io/name: redis
+        app.kubernetes.io/component: {{ .Values.redis.name_prefix }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: redis
+          image: {{ .Values.common.images.redis }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+          args: ["--requirepass", "$(REDIS_PASSWORD)"]
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" .Values.redis.name_prefix) }}
+                  key: redis_password
+          ports:
+            - name: redis
+              containerPort: {{ .Values.common.config.redis_port }}
+
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'redis-cli -a "$REDIS_PASSWORD" -h 127.0.0.1 -p {{ .Values.common.config.redis_port }} ping | grep PONG'
+            initialDelaySeconds: 20
+            periodSeconds: 10
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'redis-cli -a "$REDIS_PASSWORD" -h 127.0.0.1 -p {{ .Values.common.config.redis_port }} ping | grep PONG'
+            initialDelaySeconds: 20
+            periodSeconds: 10
+
+          volumeMounts:
+            - name: data
+              mountPath: /data
+
+            - name: config
+              mountPath: /usr/local/etc/redis
+              readOnly: true
+
+            - name: tmp
+              mountPath: /tmp
+
+          resources:
+            requests:
+              cpu: {{ .Values.redis.resources.requests.cpu | quote }}
+              memory: {{ .Values.redis.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.redis.resources.limits.cpu | quote }}
+              memory: {{ .Values.redis.resources.limits.memory | quote }}
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.redis.name_prefix }}-storage
+
+        - name: config
+          configMap:
+            name: {{ .Values.redis.name_prefix }}-config
+
+        - name: tmp
+          emptyDir: {}
+{{- end }}

@@ -1,0 +1,21 @@
+---
+{{- $embedded_pgsql := (.Values.embedded_services_pgsql | default false) -}}
+{{- if $embedded_pgsql }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.postgresql.name_prefix }}-svc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elitea.labels.common" $ | nindent 4 }}
+    app.kubernetes.io/name: postgresql
+spec:
+  type: ClusterIP
+  ports:
+    - name: pgsql
+      port: {{ .Values.postgresql.port }}
+      targetPort: {{ .Values.postgresql.port }}
+  selector:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: {{ .Values.postgresql.name_prefix }}
+{{- end }}

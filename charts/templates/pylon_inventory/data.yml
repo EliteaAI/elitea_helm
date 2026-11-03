@@ -1,0 +1,21 @@
+---
+{{- if .Values.pylon_inventory.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.pylon_inventory.name_prefix }}-data
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+data:
+{{- $files := .Files.Glob "data/configs/pylon_inventory/*.yml" -}}
+{{- if $files }}
+{{ $files.AsConfig | nindent 2 }}
+{{- end }}
+  pylon.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_inventory/pylon.yml.tpl") . | nindent 4 }}
+  bootstrap.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_inventory/bootstrap.yml.tpl") . | nindent 4 }}
+  inventory_plugin.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_inventory/inventory_plugin.yml.tpl") . | nindent 4 }}
+{{- end }}

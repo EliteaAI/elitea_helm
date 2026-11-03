@@ -1,0 +1,30 @@
+[project]
+name = "helm_k8s_main"
+version = "0.0.1"
+description = " A module for deploying Elieta with Helm"
+authors = [
+    {name = "Roman Mezentsev",email = "roman_mezentsev@epam.com"}
+]
+license = {text = "Apache-2.0 license"}
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "prek>=0.3.3",
+]
+
+[dependency-groups]
+dev = [
+    "commitizen>=4.19.3",
+]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "commitizen"
+version = "2.0.7"
+tag_format = "v$version"
+version_scheme = "semver"
+update_changelog_on_bump = true
+changelog_file = "CHANGELOG.md"
+major_version_zero = false
+# chart version; appVersion is bumped by hand (it is the EliteA platform release)
+version_files = ["charts/Chart.yaml:^version:"]

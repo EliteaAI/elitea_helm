@@ -1,0 +1,11 @@
+{{- if .Values.pylon_deepwiki.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: deepwiki-worker
+  namespace: {{ .Release.Namespace }}
+
+{{- end }}

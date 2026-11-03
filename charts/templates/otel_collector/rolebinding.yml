@@ -1,0 +1,17 @@
+---
+{{- if .Values.otel_collector.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Namespace }}:prometheus-tracing
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.otel_collector.name_prefix }}
+    namespace: {{ .Release.Namespace | quote }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}:prometheus-tracing
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

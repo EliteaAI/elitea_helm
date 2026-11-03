@@ -1,0 +1,20 @@
+---
+{{- $embedded_redis := or (.Values.embedded_services_redis | default false) -}}
+{{- if $embedded_redis }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: {{ .Values.redis.name_prefix }}-storage
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - {{ .Values.redis.persistence.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.redis.persistence.storageClass }}
+  storageClassName: {{ .Values.redis.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.redis.persistence.size | default "8Gi" }}
+{{- end }}

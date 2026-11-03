@@ -1,0 +1,21 @@
+---
+
+{{- if .Values.pylon_deepwiki.enabled}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: {{ .Values.pylon_deepwiki.name_prefix }}-storage
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.pylon_deepwiki.storage.class}}
+
+  resources:
+    requests:
+      storage: {{ .Values.pylon_deepwiki.storage.size }}
+{{- end }}

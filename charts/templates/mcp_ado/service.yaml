@@ -1,0 +1,24 @@
+---
+{{- if .Values.mcp_ado.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.mcp_ado.name_prefix }}-svc
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  {{- with .Values.mcp_ado.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  selector:
+    name: {{ .Values.mcp_ado.name_prefix }}
+  ports:
+    - name: http
+      appProtocol: http
+      protocol: TCP
+      port: {{ .Values.mcp_ado.service.port }}
+      targetPort: http
+{{- end }}

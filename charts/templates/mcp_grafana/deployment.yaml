@@ -1,0 +1,104 @@
+---
+{{- if .Values.mcp_grafana.enabled }}
+{{- $mcp := .Values.mcp_grafana }}
+{{- $containerPort := required "mcp_grafana.mcp.address must end with a port number" (regexFind "[0-9]+$" $mcp.mcp.address) | int }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $mcp.name_prefix }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+    name: {{ $mcp.name_prefix }}
+    app.kubernetes.io/component: mcp-grafana
+spec:
+  replicas: {{ $mcp.replicas }}
+  selector:
+    matchLabels:
+      name: {{ $mcp.name_prefix }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ toJson (dict "grafana" $mcp.grafana "mcp" $mcp.mcp) | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/mcp_grafana/secret.yml") . | sha256sum }}
+      labels:
+        name: {{ $mcp.name_prefix }}
+        app.kubernetes.io/component: mcp-grafana
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 33
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mcp-grafana
+          image: {{ .Values.common.images.mcp_grafana | quote }}
+          imagePullPolicy: {{ $mcp.image_pull_policy }}
+          command:
+            - /app/mcp-grafana
+          args:
+            - --transport
+            - {{ $mcp.mcp.transport | quote }}
+            - --address
+            - {{ $mcp.mcp.address | quote }}
+            - --endpoint-path
+            - {{ $mcp.mcp.endpoint_path | quote }}
+            - --allowed-hosts
+            - {{ $mcp.mcp.allowed_hosts | quote }}
+            - --log-level
+            - {{ $mcp.mcp.log_level | quote }}
+            {{- if $mcp.mcp.allowed_origins }}
+            - --allowed-origins
+            - {{ $mcp.mcp.allowed_origins | quote }}
+            {{- end }}
+            {{- if $mcp.mcp.disable_write }}
+            - --disable-write
+            {{- end }}
+            {{- with $mcp.mcp.additional_args }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            - name: GRAFANA_URL
+              value: {{ required "mcp_grafana.grafana.url is required" $mcp.grafana.url | quote }}
+            - name: GRAFANA_SERVICE_ACCOUNT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mcp_grafana.name_prefix }}-secret
+                  key: token_secret_key
+            {{- if $mcp.grafana.org_id }}
+            - name: GRAFANA_ORG_ID
+              value: {{ $mcp.grafana.org_id | quote }}
+            {{- end }}
+            {{- if $mcp.grafana.extra_headers }}
+            - name: GRAFANA_EXTRA_HEADERS
+              value: {{ $mcp.grafana.extra_headers | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ $containerPort }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml $mcp.resources | nindent 12 }}
+{{- end }}

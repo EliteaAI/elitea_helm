@@ -1,0 +1,19 @@
+---
+{{- if .Values.pylon_deepwiki.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: {{ .Values.pylon_deepwiki.name_prefix }}-svc
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    name: {{ .Values.pylon_deepwiki.name_prefix }}
+
+  ports:
+    - name: {{ .Values.pylon_deepwiki.name_prefix }}
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+{{- end}}

@@ -1,0 +1,1222 @@
+{
+  "type": "object",
+  "properties": {
+    "ingress_enabled": {
+      "type": "boolean"
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "sticky": {
+          "type": "object",
+          "properties": {
+            "cookieName": {
+              "type": "string"
+            },
+            "cookieTtlSeconds": {
+              "type": "integer"
+            }
+          }
+        },
+        "annotations": {
+          "type": "object"
+        }
+      }
+    },
+    "embedded_services_redis": {
+      "type": "boolean"
+    },
+    "embedded_services_pgsql": {
+      "type": "boolean"
+    },
+    "redis_aws_cloud": {
+      "type": "boolean"
+    },
+    "redis_queue_random_suffix": {
+      "type": "string"
+    },
+    "pylons_mesh_enabled": {
+      "type": "boolean"
+    },
+    "autocreate_db": {
+      "type": "boolean"
+    },
+    "tracing_enabled": {
+      "type": "boolean"
+    },
+    "external_proxy_enabled": {
+      "type": "boolean"
+    },
+    "http_proxy": {
+      "type": "string"
+    },
+    "https_proxy": {
+      "type": "string"
+    },
+    "no_proxy": {
+      "type": "string"
+    },
+    "external_ca_enabled": {
+      "type": "boolean"
+    },
+    "common": {
+      "type": "object",
+      "properties": {
+        "name_prefix": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "tools_enabled": {
+          "type": "boolean"
+        },
+        "elitea_repo_type": {
+          "type": "string"
+        },
+        "release": {
+          "type": "string"
+        },
+        "images": {
+          "type": "object",
+          "properties": {
+            "curl": {
+              "type": "string"
+            },
+            "redis": {
+              "type": "string"
+            },
+            "postgres": {
+              "type": "string"
+            },
+            "deepwiki_worker": {
+              "type": "string"
+            },
+            "inventory_worker": {
+              "type": "string"
+            },
+            "otel_collector": {
+              "type": "string"
+            },
+            "mcp_grafana": {
+              "type": "string"
+            },
+            "mcp_ado": {
+              "type": "string"
+            },
+            "internal_repo": {
+              "type": "string"
+            }
+          }
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "app_proto": {
+              "type": "string"
+            },
+            "cookies_secure": {
+              "type": "string"
+            },
+            "cookies_lifetime": {
+              "type": "string"
+            },
+            "app_host": {
+              "type": "string"
+            },
+            "debug": {
+              "type": "string"
+            },
+            "sandbox_timeout_seconds": {
+              "type": "string"
+            },
+            "redis_host": {
+              "type": "string"
+            },
+            "redis_port": {
+              "type": "string"
+            },
+            "redis_ssl": {
+              "type": "string"
+            },
+            "postgres_host": {
+              "type": "string"
+            },
+            "postgres_port": {
+              "type": "string"
+            },
+            "postgres_db": {
+              "type": "string"
+            },
+            "ai_project_allowed_domains": {
+              "type": "string"
+            },
+            "sso_provider": {
+              "type": "string"
+            },
+            "sso_token_expiration": {
+              "type": "integer"
+            }
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "properties": {
+            "redis_password": {
+              "type": "string"
+            },
+            "postgres_user": {
+              "type": "string"
+            },
+            "postgres_password": {
+              "type": "string"
+            },
+            "hmacs": {
+              "type": "object",
+              "properties": {
+                "rpc_hmac_key": {
+                  "type": "string"
+                },
+                "event_hmac_key": {
+                  "type": "string"
+                },
+                "exposure_hmac_key": {
+                  "type": "string"
+                },
+                "indexer_hmac_key": {
+                  "type": "string"
+                },
+                "mesh_hmac_key": {
+                  "type": "string"
+                }
+              }
+            },
+            "auth": {
+              "type": "object",
+              "properties": {
+                "application_auth_secret_key": {
+                  "type": "string"
+                },
+                "default_admin_password": {
+                  "type": "string"
+                }
+              }
+            },
+            "main": {
+              "type": "object",
+              "properties": {
+                "application_main_secret_key": {
+                  "type": "string"
+                },
+                "secrets_master_key": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "existingSecret": {
+          "type": "string"
+        }
+      }
+    },
+    "pylon_auth": {
+      "type": "object",
+      "properties": {
+        "name_prefix": {
+          "type": "string"
+        },
+        "log_level": {
+          "type": "string"
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "vpa_enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "pylon_main": {
+      "type": "object",
+      "properties": {
+        "name_prefix": {
+          "type": "string"
+        },
+        "log_level": {
+          "type": "string"
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string"
+            },
+            "tmp_size": {
+              "type": "string"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "vpa_enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "pylon_indexer": {
+      "type": "object",
+      "properties": {
+        "name_prefix": {
+          "type": "string"
+        },
+        "log_level": {
+          "type": "string"
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string"
+            },
+            "tmp_size": {
+              "type": "string"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "vpa_enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "internal_repo": {
+      "type": "object",
+      "properties": {
+        "resources": {
+          "type": "object",
+          "properties": {
+            "vpa_enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "properties": {
+        "name_prefix": {
+          "type": "string"
+        },
+        "max_memory": {
+          "type": "string"
+        },
+        "maxmemory_policy": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "persistence": {
+          "type": "object",
+          "properties": {
+            "size": {
+              "type": "string"
+            },
+            "accessMode": {
+              "type": "string"
+            },
+            "storageClass": {
+              "type": "string"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "vpa_enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "postgresql": {
+      "type": "object",
+      "properties": {
+        "name_prefix": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "persistence": {
+          "type": "object",
+          "properties": {
+            "size": {
+              "type": "string"
+            },
+            "accessMode": {
+              "type": "string"
+            },
+            "storageClass": {
+              "type": "string"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "vpa_enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "tmpfs": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "size": {
+                  "type": "string"
+                }
+              }
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "pylon_deepwiki": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "log_level": {
+          "type": "string"
+        },
+        "name_prefix": {
+          "type": "string"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "vpa_enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string"
+            },
+            "tmp_size": {
+              "type": "string"
+            }
+          }
+        },
+        "configs": {
+          "type": "object",
+          "properties": {
+            "basePath": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "aiRunPlatform": {
+              "type": "object",
+              "properties": {
+                "token": {
+                  "type": "string"
+                },
+                "verify": {
+                  "type": "boolean"
+                },
+                "timeout": {
+                  "type": "integer"
+                },
+                "delay": {
+                  "type": "integer"
+                },
+                "project_id": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "jobs": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "maxConcurrentJobs": {
+              "type": "integer"
+            },
+            "ttlSecondsAfterFinished": {
+              "type": "integer"
+            },
+            "resources": {
+              "type": "object",
+              "properties": {
+                "requests": {
+                  "type": "object",
+                  "properties": {
+                    "cpu": {
+                      "type": "string"
+                    },
+                    "memory": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "limits": {
+                  "type": "object",
+                  "properties": {
+                    "cpu": {
+                      "type": "string"
+                    },
+                    "memory": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "pylon_imagegen": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "log_level": {
+          "type": "string"
+        },
+        "name_prefix": {
+          "type": "string"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "vpa_enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string"
+            },
+            "tmp_size": {
+              "type": "string"
+            }
+          }
+        },
+        "configs": {
+          "type": "object",
+          "properties": {
+            "aiRunPlatform": {
+              "type": "object",
+              "properties": {
+                "token": {
+                  "type": "string"
+                },
+                "verify": {
+                  "type": "boolean"
+                },
+                "timeout": {
+                  "type": "integer"
+                },
+                "delay": {
+                  "type": "integer"
+                },
+                "project_id": {
+                  "type": "integer"
+                }
+              }
+            },
+            "imageBucket": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "pylon_inventory": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name_prefix": {
+          "type": "string"
+        },
+        "log_level": {
+          "type": "string"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "vpa_enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string"
+            },
+            "tmp_size": {
+              "type": "string"
+            }
+          }
+        },
+        "configs": {
+          "type": "object",
+          "properties": {
+            "basePath": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "aiRunPlatform": {
+              "type": "object",
+              "properties": {
+                "token": {
+                  "type": "string"
+                },
+                "verify": {
+                  "type": "boolean"
+                },
+                "timeout": {
+                  "type": "integer"
+                },
+                "delay": {
+                  "type": "integer"
+                },
+                "project_id": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "jobs": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "maxConcurrentJobs": {
+              "type": "integer"
+            },
+            "ttlSecondsAfterFinished": {
+              "type": "integer"
+            },
+            "resources": {
+              "type": "object",
+              "properties": {
+                "requests": {
+                  "type": "object",
+                  "properties": {
+                    "cpu": {
+                      "type": "string"
+                    },
+                    "memory": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "limits": {
+                  "type": "object",
+                  "properties": {
+                    "cpu": {
+                      "type": "string"
+                    },
+                    "memory": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "otel_collector": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name_prefix": {
+          "type": "string"
+        },
+        "gsa": {
+          "type": "string"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "vpa_enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "mcp_grafana": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name_prefix": {
+          "type": "string"
+        },
+        "image_pull_policy": {
+          "type": "string"
+        },
+        "replicas": {
+          "type": "integer"
+        },
+        "grafana": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "org_id": {
+              "type": "string"
+            },
+            "extra_headers": {
+              "type": "string"
+            },
+            "token_secret_key": {
+              "type": "string"
+            }
+          }
+        },
+        "mcp": {
+          "type": "object",
+          "properties": {
+            "transport": {
+              "type": "string"
+            },
+            "address": {
+              "type": "string"
+            },
+            "endpoint_path": {
+              "type": "string"
+            },
+            "allowed_hosts": {
+              "type": "string"
+            },
+            "allowed_origins": {
+              "type": "string"
+            },
+            "log_level": {
+              "type": "string"
+            },
+            "disable_write": {
+              "type": "boolean"
+            },
+            "additional_args": {
+              "type": "array"
+            }
+          }
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "mcp_ado": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name_prefix": {
+          "type": "string"
+        },
+        "image_pull_policy": {
+          "type": "string"
+        },
+        "replicas": {
+          "type": "integer"
+        },
+        "ado": {
+          "type": "object",
+          "properties": {
+            "organization": {
+              "type": "string"
+            },
+            "authentication": {
+              "type": "string"
+            },
+            "personal_access_token": {
+              "type": "string"
+            },
+            "legacy_api_key_enabled": {
+              "type": "boolean"
+            },
+            "mcp_api_key": {
+              "type": "string"
+            },
+            "multiple_api_keys": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "values": {
+                  "type": "object",
+                  "properties": {
+                    "user1": {
+                      "type": "string"
+                    },
+                    "user2": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "mcp": {
+          "type": "object",
+          "properties": {
+            "transport": {
+              "type": "string"
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": "integer"
+            },
+            "allowed_hosts": {
+              "type": "array"
+            },
+            "additional_args": {
+              "type": "array"
+            }
+          }
+        },
+        "cache": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "mount_path": {
+              "type": "string"
+            },
+            "size_limit": {
+              "type": "string"
+            }
+          }
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer"
+            },
+            "annotations": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "cloud_ingress_type": {
+      "type": "string",
+      "enum": [
+        "gcp",
+        "aws",
+        "azure"
+      ]
+    },
+    "hmac_auto_generate": {
+      "type": "boolean"
+    },
+    "external_ca_configmap": {
+      "type": "string"
+    },
+    "external_ca_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "saml_existing_secret": {
+      "type": "string"
+    },
+    "saml_idp_use_metadata": {
+      "type": "boolean"
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

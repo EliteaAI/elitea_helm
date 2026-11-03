@@ -1,0 +1,37 @@
+# Local trial on MicroK8s: embedded PostgreSQL and Redis, no ingress, small resources.
+# Not for production. Start with: ./install.sh   (creates the secrets and installs the chart)
+#
+# Prerequisites: microk8s enable hostpath-storage (StorageClass microk8s-hostpath); at least 6 CPU / 16 GB RAM free
+ingress_enabled: false
+
+common:
+  existingSecret: elitea-secrets          # created by install.sh
+  config:
+    app_proto: http
+    app_host: localhost
+    cookies_secure: "false"
+
+# microk8s-hostpath is the StorageClass of the hostpath-storage addon; sizes are small on purpose
+pylon_main:
+  storage: {class: microk8s-hostpath, size: 10Gi, tmp_size: 5Gi}
+  resources:
+    requests: {cpu: 500m, memory: 2Gi}
+    limits: {cpu: "2", memory: 4Gi}
+pylon_auth:
+  storage: {class: microk8s-hostpath, size: 1Gi}
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 1Gi}
+pylon_indexer:
+  storage: {class: microk8s-hostpath, size: 10Gi, tmp_size: 5Gi}
+  resources:
+    requests: {cpu: 500m, memory: 2Gi}
+    limits: {cpu: "2", memory: 4Gi}
+postgresql:
+  persistence: {storageClass: microk8s-hostpath, size: 10Gi}
+  resources:
+    tmpfs: {enabled: true, size: 512Mi}
+    requests: {cpu: 250m, memory: 1Gi}
+    limits: {cpu: "1", memory: 2Gi}
+redis:
+  persistence: {storageClass: microk8s-hostpath, size: 1Gi}

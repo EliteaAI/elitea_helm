@@ -1,0 +1,167 @@
+---
+# OpenTelemetry Collector Configuration
+# Central routing layer for all telemetry data
+#
+# Data types are routed based on the `telemetry.data_type` span/log attribute:
+#   - api_traces  -> Jaeger (+ Dynatrace when configured)
+#   - db_queries  -> Jaeger (+ Dynatrace when configured)
+#   - llm_traces  -> Jaeger (+ Dynatrace when configured)
+#   - rpc_calls   -> Jaeger
+#   - logs        -> Jaeger (+ Elasticsearch when configured)
+#   - monitoring  -> Prometheus (+ Dynatrace when configured)
+
+receivers:
+  # OTLP receiver for traces, logs, and metrics
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  # Batch processor for better performance
+  batch:
+    timeout: 5s
+    send_batch_size: 100
+    send_batch_max_size: 200
+
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  # Resource processor to add common attributes
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: ${DEPLOYMENT_ENVIRONMENT}
+        action: upsert
+      - key: service.namespace
+        value: elitea
+        action: upsert
+
+  resourcedetection:
+    # detect cluster name and location
+    detectors: [gcp]
+    timeout: 10s
+
+  transform:
+    # "location", "cluster", "namespace", "job", "instance", and "project_id" are reserved, and
+    # metrics containing these labels will be rejected.  Prefix them with exported_ to prevent this.
+    metric_statements:
+      - context: datapoint
+        statements:
+          - set(datapoint.attributes["exported_location"], datapoint.attributes["location"])
+          - delete_key(datapoint.attributes, "location")
+          - set(datapoint.attributes["exported_cluster"], datapoint.attributes["cluster"])
+          - delete_key(datapoint.attributes, "cluster")
+          - set(datapoint.attributes["exported_namespace"], datapoint.attributes["namespace"])
+          - delete_key(datapoint.attributes, "namespace")
+          - set(datapoint.attributes["exported_job"], datapoint.attributes["job"])
+          - delete_key(datapoint.attributes, "job")
+          - set(datapoint.attributes["exported_instance"], datapoint.attributes["instance"])
+          - delete_key(datapoint.attributes, "instance")
+          - set(datapoint.attributes["exported_project_id"], datapoint.attributes["project_id"])
+          - delete_key(datapoint.attributes, "project_id")
+
+  # Filter processors for attribute-based routing
+  # These filter traces/logs to route to specific backends
+  # Using OTTL (OpenTelemetry Transformation Language) expressions
+
+  filter/api_traces:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["telemetry.data_type"] != "api_traces"'
+
+  filter/db_queries:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["telemetry.data_type"] != "db_queries"'
+
+  filter/llm_traces:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["telemetry.data_type"] != "llm_traces"'
+
+  filter/rpc_calls:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["telemetry.data_type"] != "rpc_calls"'
+
+  filter/http_client:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["telemetry.data_type"] != "http_client"'
+
+  # Transform processor to copy source_service to Resource service.name
+  # This enables Dynatrace to associate logs with service entities
+  transform/logs:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # Copy source_service attribute to Resource service.name for service association
+          - set(resource.attributes["service.name"], log.attributes["source_service"]) where log.attributes["source_service"] != nil
+
+exporters:
+  googlemanagedprometheus: {}
+  googlecloud: {}
+
+service:
+  extensions: []
+
+  pipelines:
+    # Default traces pipeline - all traces go to Jaeger + Dynatrace
+    # This catches traces without a specific data_type attribute
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, transform, resourcedetection, resource, batch]
+      exporters: [googlecloud]
+
+    # API traces pipeline - routed to Dynatrace + Jaeger
+    traces/api:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/api_traces, transform, resourcedetection, resource, batch]
+      exporters: [googlecloud]
+
+    # DB query traces pipeline - routed to Dynatrace + Jaeger
+    traces/db:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/db_queries, transform, resourcedetection, resource, batch]
+      exporters: [googlecloud]
+
+    # LLM traces pipeline (from Langfuse) - routed to Dynatrace + Jaeger
+    traces/llm:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/llm_traces, transform, resourcedetection, resource, batch]
+      exporters: [googlecloud]
+
+    # RPC calls pipeline
+    traces/rpc:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/rpc_calls, transform, resourcedetection, resource, batch]
+      exporters: [googlecloud]
+
+    # HTTP client traces pipeline
+    traces/http_client:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/http_client, transform, resourcedetection, resource, batch]
+      exporters: [googlecloud]
+
+    # Logs pipeline - from logging_hub
+    # transform/logs copies source_service to Resource service.name for Dynatrace association
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/logs, transform, resourcedetection, resource, batch]
+      exporters: [googlecloud]  # stdout + Dynatrace
+
+    # Metrics pipeline - routed to Prometheus + Dynatrace
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, transform, resourcedetection, resource, batch]
+      exporters: [googlemanagedprometheus]

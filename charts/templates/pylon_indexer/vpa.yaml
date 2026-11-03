@@ -1,0 +1,31 @@
+{{- $pi  := .Values.pylon_indexer -}}
+
+---
+{{- if .Values.pylon_indexer.resources.vpa_enabled }}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ $pi.name_prefix }}-vpa
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $pi.name_prefix }}
+  updatePolicy:
+    updateMode: {{ .Values.pylon_indexer.resources.mode }}
+  resourcePolicy:
+    containerPolicies:
+      - containerName: {{ $pi.name_prefix }}
+        minAllowed:
+          cpu: "4"
+          memory: "2Gi"
+        maxAllowed:
+          cpu: "8"
+          memory: "30Gi"
+        controlledResources:
+          - cpu
+          - memory
+{{- end }}

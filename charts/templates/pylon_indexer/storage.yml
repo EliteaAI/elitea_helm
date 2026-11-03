@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: {{ .Values.pylon_indexer.name_prefix }}-storage
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.pylon_indexer.storage.class }}
+  resources:
+    requests:
+      storage: "{{ .Values.pylon_indexer.storage.size }}"

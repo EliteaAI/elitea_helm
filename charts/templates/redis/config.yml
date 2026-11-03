@@ -1,0 +1,24 @@
+---
+{{- $embedded_redis :=  (.Values.embedded_services_redis | default false) -}}
+{{- if $embedded_redis }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: {{ .Values.redis.name_prefix }}-config
+  namespace: {{ .Release.Namespace }}
+data:
+  redis.conf: |
+    bind 0.0.0.0
+    port {{ .Values.common.config.redis_port }}
+    protected-mode yes
+    tcp-keepalive 300
+    # Persistence
+    save 60 1
+    appendonly yes
+    dir /data
+    # Memory policy
+    maxmemory {{ .Values.redis.max_memory }}
+    maxmemory-policy {{ .Values.redis.maxmemory_policy }}
+{{- end }}

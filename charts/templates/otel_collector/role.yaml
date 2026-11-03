@@ -1,0 +1,13 @@
+---
+{{- if .Values.otel_collector.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Namespace }}:prometheus-tracing
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+{{- end }}

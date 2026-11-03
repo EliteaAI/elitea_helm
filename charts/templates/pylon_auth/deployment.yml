@@ -1,0 +1,586 @@
+{{- $pa  := .Values.pylon_auth -}}
+{{- $cfg := .Files.Glob "data/configs/pylon_auth/*.yml" -}}
+{{- $embedded_pgsql := (.Values.embedded_services_pgsql | default false) -}}
+{{- $embedded_redis := (.Values.embedded_services_redis | default false) -}}
+{{- $int_repo := eq (.Values.common.elitea_repo_type | default "standard") "internal" -}}
+{{- $no_init := not (or $embedded_pgsql $embedded_redis $int_repo) -}}
+{{- $hasSAMLTpl := not (empty (.Files.Glob "data/configs/pylon_auth/auth_saml.yml.tpl")) -}}
+{{- $hasOIDCTpl := not (empty (.Files.Glob "data/configs/pylon_auth/auth_oidc.yml.tpl")) -}}
+{{- $sso := (default "form" .Values.common.config.sso_provider | lower) -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $pa.name_prefix }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+    name: {{ $pa.name_prefix }}
+spec:
+  selector:
+    matchLabels:
+      name: {{ $pa.name_prefix }}
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/pylon_auth/config.yml") . | sha256sum }}
+        checksum/data: {{ include (print $.Template.BasePath "/pylon_auth/data.yml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/pylon_auth/secret.yml") . | sha256sum }}
+        checksum/secret-sso: {{ include (print $.Template.BasePath "/pylon_auth/secrets_sso.yml") . | sha256sum }}
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+      labels:
+        name: {{ $pa.name_prefix }}
+    spec:
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 33
+        seccompProfile:
+          type: RuntimeDefault
+
+      volumes:
+        - name: {{ $pa.name_prefix }}-storage
+          persistentVolumeClaim:
+            claimName: {{ $pa.name_prefix }}-storage
+
+        - name: {{ $pa.name_prefix }}-tmp
+          emptyDir: {}
+
+        {{- $hasFiles := not (empty $cfg) -}}
+        {{- if $hasFiles }}
+        - name: {{ $pa.name_prefix }}-configs-vol
+          projected:
+            sources:
+              - configMap:
+                  name: {{ $pa.name_prefix }}-data
+                  items:
+                    {{- if $hasFiles }}
+                    {{- range $path, $_ := $cfg }}
+                    {{- if and (ne (base $path) "auth_oidc.yml") (ne (base $path) "auth_saml.yml") }}
+                    - key: {{ base $path }}
+                      path: {{ base $path }}
+                    {{- end }}
+                    {{- end }}
+                    {{- end }}
+                    - key: bootstrap.yml
+                      path: bootstrap.yml
+
+                    - key: auth_core.yml
+                      path: auth_core.yml
+
+                    - key: tracing.yml
+                      path: tracing.yml
+
+              {{- if and (eq $sso "oidc") $hasOIDCTpl }}
+              - secret:
+                  name: {{ .Values.pylon_auth.name_prefix }}-secret-sso
+                  items:
+                    - key: auth_oidc.yml
+                      path: auth_oidc.yml
+              {{- end }}
+
+              {{- if and (eq $sso "saml") $hasSAMLTpl }}
+              - secret:
+                  name: {{ .Values.pylon_auth.name_prefix }}-secret-sso
+                  items:
+                    - key: auth_saml.yml
+                      path: auth_saml.yml
+              {{- end }}
+        {{- end }}
+
+        - name: {{ $pa.name_prefix }}-pylonyml-vol
+          configMap:
+            name: {{ $pa.name_prefix }}-data
+            items:
+              - key: pylon.yml
+                path: pylon.yml
+
+        {{- if .Values.external_ca_enabled }}
+        - name: {{ $pa.name_prefix }}-cacerts
+          configMap:
+            name: {{ required "external_ca_configmap is required when external_ca_enabled" .Values.external_ca_configmap }}
+        {{- end }}
+
+      {{- if $no_init }}
+      initContainers: []
+      {{- else }}
+      initContainers:
+        {{- if $int_repo }}
+        - name: wait-for-internal-repo
+          image: {{ .Values.common.images.curl }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - |
+              set -e
+              REPO_HOST="internal-repo-svc.{{ .Release.Namespace }}.svc.cluster.local"
+              HEALTH="http://${REPO_HOST}:8080/healthz"
+              echo "Waiting for internal repo health at ${HEALTH} ..."
+              until curl -fsS --max-time 5 "$HEALTH" >/dev/null; do
+                sleep 3
+              done
+              # Waitin artefact
+              ART="http://${REPO_HOST}:8080/target/public/depot/{{ .Values.common.release }}/plugins/bootstrap/source"
+              echo "Waiting for artifact ${ART} ..."
+              until curl -fsSI "$ART" | grep -qE 'HTTP/.* 200'; do
+                sleep 5
+              done
+              echo "Internal repo is ready."
+      {{- end }}
+      {{- if $embedded_pgsql }}
+        - name: wait-postgres
+          image: {{ .Values.common.images.postgres }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - >
+              set -eu;
+              export PGPASSWORD="${POSTGRES_PASSWORD}";
+              H="${POSTGRES_HOST}";
+              P="${POSTGRES_PORT}";
+              U="${POSTGRES_USER}";
+              DB="${POSTGRES_DB}";
+              for i in $(seq 1 30); do
+                psql -h "$H" -p "$P" -U "$U" -d "$DB" -c '\q' >/dev/null 2>&1 && exit 0;
+                echo "waiting for postgres $H:$P (auth)..."; sleep 8;
+              done;
+              echo "postgres auth/connect failed" >&2; exit 1;
+          env:
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: postgres_host
+
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: postgres_port
+
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: postgres_db
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: postgres_user
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: postgres_password
+
+      {{- end }}
+      {{- if $embedded_redis }}
+        - name: wait-redis
+          image: {{ .Values.common.images.redis }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - >
+              set -eu;
+              H="${REDIS_HOST}";
+              P="${REDIS_PORT}";
+              SSL="${REDIS_SSL}";
+              PROTO="redis";
+              EXTRA="";
+              if [ "$SSL" = "true" ] || [ "$SSL" = "1" ]; then
+                PROTO="rediss"; EXTRA="--tls";
+              fi;
+              for i in $(seq 1 30); do
+                redis-cli $EXTRA -h "$H" -p "$P" -a ${REDIS_PASSWORD} PING 2>/dev/null | grep -q PONG && exit 0;
+                echo "waiting for redis $PROTO://$H:$P (auth)..."; sleep 7;
+              done;
+              echo "redis auth/connect failed" >&2; exit 1;
+          env:
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: redis_host
+                  optional: true
+
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: redis_port
+                  optional: true
+
+            - name: REDIS_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: redis_ssl
+                  optional: true
+
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: redis_password
+
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ $pa.name_prefix }}
+          image: {{ .Values.common.image }}
+          imagePullPolicy: Always
+
+          env:
+          {{- if .Values.external_proxy_enabled }}
+
+            - name: http_proxy
+              value: "{{ .Values.http_proxy }}"
+
+            - name: HTTP_PROXY
+              value: "{{ .Values.http_proxy }}"
+
+            - name: https_proxy
+              value: "{{ .Values.https_proxy }}"
+
+            - name: HTTPS_PROXY
+              value: "{{ .Values.https_proxy }}"
+
+            - name: no_proxy
+              value: "{{ .Values.no_proxy }}"
+
+            - name: NO_PROXY
+              value: "{{ .Values.no_proxy }}"
+
+          {{- end }}
+            - name: PYLON_WEB_RUNTIME
+              value: gevent
+
+            - name: PYLON_CONFIG_SEED
+              value: file:/data/pylon.yml
+
+            - name: ELITEA_RELEASE
+              value: "{{ .Values.common.release }}"
+
+            - name: DEFAULT_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: default_admin_password
+
+            {{- if eq $sso "oidc" -}}
+            - name: AUTHORIZATION_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: authorization_endpoint
+
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: client_id
+
+            - name: CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: client_secret
+
+            - name: END_SESSION_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: end_session_endpoint
+
+            - name: METADATA_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: metadata_endpoint
+
+            - name: TOKEN_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: token_endpoint
+
+            - name: URL_MODE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: url_mode
+
+            - name: USERINFO_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: userinfo_endpoint
+
+            - name: SSO_TOKEN_EXPIRATION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: sso_token_expiration
+            {{- end}}
+
+            {{- if eq $sso "saml" }}
+            {{- range $env, $key := dict "SAML_SP_KEY" "sp_key" "SAML_SP_CERT" "sp_cert" }}
+            - name: {{ $env }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "saml_existing_secret is required when sso_provider=saml" $.Values.saml_existing_secret }}
+                  key: {{ $key }}
+            {{- end }}
+            {{- $idp := ternary (dict "SAML_IDP_METADATA" "idp_metadata") (dict "SAML_IDP_CERT" "idp_cert") (default false .Values.saml_idp_use_metadata) }}
+            {{- range $env, $key := $idp }}
+            - name: {{ $env }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.saml_existing_secret }}
+                  key: {{ $key }}
+            {{- end }}
+            {{- end }}
+
+            - name: NAME
+              value: "{{ $pa.name_prefix }}"
+
+            - name: NAME_PREFIX
+              value: "{{ .Values.common.name_prefix }}"
+
+            - name: APP_PROTO
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: app_proto
+
+            - name: APP_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: app_host
+
+            - name: APPLICATION_AUTH_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: application_auth_secret_key
+
+            - name: COOKIES_SECURE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: cookies_secure
+
+            - name: COOKIES_LIFETIME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: cookies_lifetime
+
+            - name: RPC_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: rpc_hmac_key
+
+            - name: EVENT_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: event_hmac_key
+
+            - name: INDEXER_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: indexer_hmac_key
+
+            - name: EXPOSURE_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: exposure_hmac_key
+
+            - name: MESH_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: mesh_hmac_key
+
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: redis_host
+
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: redis_port
+
+            - name: REDIS_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: redis_ssl
+
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: redis_password
+
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: postgres_host
+
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: postgres_port
+
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pa.name_prefix }}-config
+                  key: postgres_db
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: postgres_user
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: postgres_password
+
+          ports:
+            - containerPort: 8080
+            {{- if .Values.pylons_mesh_enabled }}
+            - containerPort: 5010
+            - containerPort: 5011
+            {{- end }}
+
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+            successThreshold: 1
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 15
+            timeoutSeconds: 2
+            failureThreshold: 3
+            successThreshold: 1
+
+          volumeMounts:
+            - name: {{ $pa.name_prefix }}-storage
+              mountPath: /data
+
+            - name: {{ $pa.name_prefix }}-tmp
+              mountPath: /tmp
+
+            {{- if or $hasFiles }}
+            - name: {{ $pa.name_prefix }}-configs-vol
+              mountPath: /data/configs
+              readOnly: true
+            {{- end }}
+
+            - name: {{ $pa.name_prefix }}-pylonyml-vol
+              mountPath: /data/pylon.yml
+              subPath: pylon.yml
+              readOnly: true
+
+            {{- if .Values.external_ca_enabled }}
+            - name: {{ $pa.name_prefix }}-cacerts
+              mountPath: /cacerts
+              readOnly: true
+            {{- end }}
+
+          resources:
+            requests:
+              cpu: "{{ .Values.pylon_auth.resources.requests.cpu }}"
+              memory: "{{ .Values.pylon_auth.resources.requests.memory }}"
+            limits:
+              cpu: "{{ .Values.pylon_auth.resources.limits.cpu }}"
+              memory: "{{ .Values.pylon_auth.resources.limits.memory }}"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL

@@ -1,0 +1,53 @@
+{{- $type := .Values.cloud_ingress_type | default "" -}}
+{{- if and .Values.ingress_enabled (has $type (list "aws" "gcp" "azure")) }}
+{{- $ttl := .Values.ingress.sticky.cookieTtlSeconds }}
+{{- if eq $type "gcp" }}
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ .Values.pylon_main.name_prefix }}-backendconfig
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+spec:
+  timeoutSec: 3600
+  sessionAffinity:
+    affinityType: GENERATED_COOKIE
+    affinityCookieTtlSec: {{ $ttl }}
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.common.name_prefix }}-ingress-lb
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  annotations:
+    {{- if eq $type "aws" }}
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.type=lb_cookie,stickiness.lb_cookie.duration_seconds={{ $ttl }}
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=3600
+    {{- else if eq $type "azure" }}
+    appgw.ingress.kubernetes.io/cookie-based-affinity: "true"
+    appgw.ingress.kubernetes.io/request-timeout: "3600"
+    {{- end }}
+    {{- range $k, $v := .Values.ingress.annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ get (dict "aws" "alb" "gcp" "gce" "azure" "azure-application-gateway") $type }}
+  rules:
+    - host: {{ .Values.common.config.app_host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.pylon_main.name_prefix }}-svc
+                port:
+                  number: 8080
+{{- end }}

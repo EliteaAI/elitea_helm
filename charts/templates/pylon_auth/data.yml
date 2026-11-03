@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+  name: {{ .Values.pylon_auth.name_prefix }}-data
+  namespace: {{ .Release.Namespace }}
+data:
+{{- $files := .Files.Glob "data/configs/pylon_auth/*.yml" -}}
+{{- if $files }}
+{{ $files.AsConfig | nindent 2 }}
+{{- end }}
+  pylon.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_auth/pylon.yml.tpl") . | nindent 4 }}
+  bootstrap.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_auth/bootstrap.yml.tpl") . | nindent 4 }}
+  auth_core.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_auth/auth_core.yml.tpl") . | nindent 4 }}
+  tracing.yml: |
+{{ tpl (.Files.Get "data/configs/pylon_auth/tracing.yml.tpl") . | nindent 4 }}

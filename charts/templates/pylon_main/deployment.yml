@@ -1,0 +1,569 @@
+
+{{- $pm  := .Values.pylon_main -}}
+{{- $cfg := .Files.Glob "data/configs/pylon_main/*.yml" -}}
+{{- $embedded_pgsql := (.Values.embedded_services_pgsql | default false) -}}
+{{- $embedded_redis := (.Values.embedded_services_redis | default false) -}}
+{{- $int_repo := eq (.Values.common.elitea_repo_type | default "standard") "internal" -}}
+{{- $no_init := not (or $embedded_pgsql $embedded_redis $int_repo) -}}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $pm.name_prefix }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "elitea.labels" $ | nindent 4 }}
+    name: {{ $pm.name_prefix }}
+spec:
+  selector:
+    matchLabels:
+      name: {{ $pm.name_prefix }}
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/pylon_main/config.yml") . | sha256sum }}
+        checksum/data: {{ include (print $.Template.BasePath "/pylon_main/data.yml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/pylon_main/secret.yml") . | sha256sum }}
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+      labels:
+        name: {{ $pm.name_prefix }}
+    spec:
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 33
+        seccompProfile:
+          type: RuntimeDefault
+
+      volumes:
+        - name: {{ $pm.name_prefix }}-storage
+          persistentVolumeClaim:
+            claimName: {{ $pm.name_prefix }}-storage
+
+        - name: {{ $pm.name_prefix }}-tmp-storage
+          persistentVolumeClaim:
+            claimName: {{ $pm.name_prefix }}-tmp-storage
+
+        {{- $hasFiles := not (empty $cfg) -}}
+        {{- if $hasFiles }}
+        - name: {{ $pm.name_prefix }}-configs-vol
+          configMap:
+            name: {{ $pm.name_prefix }}-data
+            items:
+              {{- if $hasFiles }}
+              {{- range $path, $_ := $cfg }}
+              - key: {{ base $path }}
+                path: {{ base $path }}
+              {{- end }}
+              {{- end }}
+
+              - key: bootstrap.yml
+                path: bootstrap.yml
+
+              - key: elitea_core.yml
+                path: elitea_core.yml
+
+              - key: shared.yml
+                path: shared.yml
+
+              - key: logging_hub.yml
+                path: logging_hub.yml
+
+              - key: worker_client.yml
+                path: worker_client.yml
+
+              - key: tracing.yml
+                path: tracing.yml
+
+        {{- end }}
+
+        - name: {{ $pm.name_prefix }}-pylonyml-vol
+          configMap:
+            name: {{ $pm.name_prefix }}-data
+            items:
+              - key: pylon.yml
+                path: pylon.yml
+
+        {{- if .Values.external_ca_enabled }}
+        - name: {{ $pm.name_prefix }}-cacerts
+          configMap:
+            name: {{ required "external_ca_configmap is required when external_ca_enabled" .Values.external_ca_configmap }}
+        {{- end }}
+
+      {{- if $no_init }}
+      initContainers:
+        - name: wait-auth
+          image: {{ .Values.common.images.curl }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - |
+              set -e
+              AUTH_SVC="{{ printf "%s-svc.%s.svc.cluster.local" .Values.pylon_auth.name_prefix .Release.Namespace }}"
+              HEALTH="http://${AUTH_SVC}:8080/healthz"
+              echo "Waiting for pylon_auth health at ${HEALTH} ..."
+              until curl -fsS --max-time 5 "$HEALTH" >/dev/null; do
+                sleep 3
+              done
+
+      {{- else }}
+      initContainers:
+        - name: wait-auth
+          image: {{ .Values.common.images.curl }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - |
+              set -e
+              AUTH_SVC="{{ printf "%s-svc.%s.svc.cluster.local" .Values.pylon_auth.name_prefix .Release.Namespace }}"
+              HEALTH="http://${AUTH_SVC}:8080/healthz"
+              echo "Waiting for pylon_auth health at ${HEALTH} ..."
+              until curl -fsS --max-time 5 "$HEALTH" >/dev/null; do
+                sleep 3
+              done
+        {{- if $int_repo }}
+        - name: wait-for-internal-repo
+          image: {{ .Values.common.images.curl }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - |
+              set -e
+              REPO_HOST="internal-repo-svc.{{ .Release.Namespace }}.svc.cluster.local"
+              HEALTH="http://${REPO_HOST}:8080/healthz"
+              echo "Waiting for internal repo health at ${HEALTH} ..."
+              until curl -fsS --max-time 5 "$HEALTH" >/dev/null; do
+                sleep 3
+              done
+              # Waitin artefact
+              ART="http://${REPO_HOST}:8080/target/public/depot/{{ .Values.common.release }}/plugins/bootstrap/source"
+              echo "Waiting for artifact ${ART} ..."
+              until curl -fsSI "$ART" | grep -qE 'HTTP/.* 200'; do
+                sleep 5
+              done
+              echo "Internal repo is ready."
+      {{- end }}
+      {{- if $embedded_pgsql }}
+        - name: wait-postgres
+          image: {{ .Values.common.images.postgres }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - >
+              set -eu;
+              export PGPASSWORD="${POSTGRES_PASSWORD}";
+              H="${POSTGRES_HOST}";
+              P="${POSTGRES_PORT}";
+              U="${POSTGRES_USER}";
+              DB="${POSTGRES_DB}";
+              for i in $(seq 1 30); do
+                psql -h "$H" -p "$P" -U "$U" -d "$DB" -c '\q' >/dev/null 2>&1 && exit 0;
+                echo "waiting for postgres $H:$P (auth)..."; sleep 8;
+              done;
+              echo "postgres auth/connect failed" >&2; exit 1;
+          env:
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: postgres_host
+
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: postgres_port
+
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: postgres_db
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: postgres_user
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: postgres_password
+
+      {{- end }}
+      {{- if $embedded_redis }}
+        - name: wait-redis
+          image: {{ .Values.common.images.redis }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 1000
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh","-c"]
+          args:
+            - >
+              set -eu;
+              H="${REDIS_HOST}";
+              P="${REDIS_PORT}";
+              SSL="${REDIS_SSL}";
+              PROTO="redis";
+              EXTRA="";
+              if [ "$SSL" = "true" ] || [ "$SSL" = "1" ]; then
+                PROTO="rediss"; EXTRA="--tls";
+              fi;
+              for i in $(seq 1 30); do
+                redis-cli $EXTRA -h "$H" -p "$P" -a ${REDIS_PASSWORD} PING 2>/dev/null | grep -q PONG && exit 0;
+                echo "waiting for redis $PROTO://$H:$P (auth)..."; sleep 7;
+              done;
+              echo "redis auth/connect failed" >&2; exit 1;
+          env:
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: redis_host
+                  optional: true
+
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: redis_port
+                  optional: true
+
+            - name: REDIS_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: redis_ssl
+                  optional: true
+
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: redis_password
+
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ $pm.name_prefix }}
+          image: {{ .Values.common.tools_enabled | default false | ternary (printf "%s-tools" .Values.common.image) .Values.common.image }}
+          imagePullPolicy: Always
+
+          env:
+          {{- if .Values.external_proxy_enabled }}
+
+            - name: http_proxy
+              value: "{{ .Values.http_proxy }}"
+
+            - name: HTTP_PROXY
+              value: "{{ .Values.http_proxy }}"
+
+            - name: https_proxy
+              value: "{{ .Values.https_proxy }}"
+
+            - name: HTTPS_PROXY
+              value: "{{ .Values.https_proxy }}"
+
+            - name: no_proxy
+              value: "{{ .Values.no_proxy }}"
+
+            - name: NO_PROXY
+              value: "{{ .Values.no_proxy }}"
+
+          {{- end }}
+            - name: PYLON_WEB_RUNTIME
+              value: gevent
+
+            - name: PYLON_CONFIG_SEED
+              value: file:/data/pylon.yml
+
+            - name: ELITEA_RELEASE
+              value: "{{ .Values.common.release }}"
+
+            - name: NAME
+              value: "{{ $pm.name_prefix }}-core"
+
+            - name: NAME_PREFIX
+              value: "{{ .Values.common.name_prefix }}"
+
+            - name: APP_PROTO
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: app_proto
+
+            - name: APP_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: app_host
+
+            - name: API_PYLON
+              value: "{{ $pm.name_prefix }}"
+
+            - name: API_NAMESPACE
+              value: "{{ .Release.Namespace }}"
+
+            - name: APPLICATION_MAIN_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: application_main_secret_key
+
+            - name: COOKIES_SECURE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: cookies_secure
+
+            - name: COOKIES_LIFETIME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: cookies_lifetime
+
+            - name: RPC_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: rpc_hmac_key
+
+            - name: EVENT_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: event_hmac_key
+
+            - name: INDEXER_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: indexer_hmac_key
+
+            - name: EXPOSURE_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: exposure_hmac_key
+
+            - name: MESH_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: mesh_hmac_key
+
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: redis_host
+
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: redis_port
+
+            - name: REDIS_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: redis_ssl
+
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: redis_password
+
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: postgres_host
+
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: postgres_port
+
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: postgres_db
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: postgres_user
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: postgres_password
+
+            - name: SECRETS_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pm.name_prefix) }}
+                  key: secrets_master_key
+
+            - name: AI_PROJECT_ALLOWED_DOMAINS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $pm.name_prefix }}-config
+                  key: ai_project_allowed_domains
+
+          ports:
+            - containerPort: 8080
+
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+            successThreshold: 1
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+            successThreshold: 1
+
+          volumeMounts:
+            - name: {{ $pm.name_prefix }}-storage
+              mountPath: /data
+
+            - name: {{ $pm.name_prefix }}-tmp-storage
+              mountPath: /tmp
+
+            {{- if $cfg }}
+            - name: {{ $pm.name_prefix }}-configs-vol
+              mountPath: /data/configs
+              readOnly: true
+            {{- end }}
+
+            - name: {{ $pm.name_prefix }}-pylonyml-vol
+              mountPath: /data/pylon.yml
+              subPath: pylon.yml
+              readOnly: true
+
+            {{- if .Values.external_ca_enabled }}
+            - name: {{ $pm.name_prefix }}-cacerts
+              mountPath: /cacerts
+              readOnly: true
+            {{- end }}
+
+          resources:
+            requests:
+              cpu: "{{ .Values.pylon_main.resources.requests.cpu }}"
+              memory: "{{ .Values.pylon_main.resources.requests.memory }}"
+            limits:
+              cpu: "{{ .Values.pylon_main.resources.limits.cpu }}"
+              memory: "{{ .Values.pylon_main.resources.limits.memory }}"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 33
+            runAsGroup: 33
+            capabilities:
+              drop:
+                - ALL

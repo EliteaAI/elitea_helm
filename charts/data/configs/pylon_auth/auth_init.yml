@@ -1,0 +1,3 @@
+---
+initial_global_admins:
+  - admin

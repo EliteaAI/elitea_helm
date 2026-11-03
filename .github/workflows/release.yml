@@ -41,6 +41,16 @@ jobs:
       - name: GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" "dist/elitea-${{ steps.ver.outputs.version }}.tgz" \
-            --title "elitea ${{ steps.ver.outputs.version }}" --generate-notes
+          set -euo pipefail
+          # the self-hosted runner has no gh: use the REST API
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          release=$(curl -fsS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+            "${api}/releases" \
+            -d "$(jq -n --arg tag "${GITHUB_REF_NAME}" --arg name "elitea ${VERSION}" \
+                  '{tag_name: $tag, name: $name, generate_release_notes: true}')")
+          upload_url=$(jq -r '.upload_url | sub("\\{.*"; "")' <<<"${release}")
+          curl -fsS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Content-Type: application/gzip" \
+            --data-binary @"dist/elitea-${VERSION}.tgz" "${upload_url}?name=elitea-${VERSION}.tgz" >/dev/null
+          echo "released: $(jq -r .html_url <<<"${release}")"

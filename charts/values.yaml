@@ -74,7 +74,7 @@ common:
     postgres_host: ""  # postgres domain or IP when NOT embedded
     postgres_port: "5432"  # postgres port
     postgres_db: "eliteadb"  # main (app) DB name, this should be present (created) before helm install
-    
+
     ai_project_allowed_domains: "centry.user"
     #--- SSO ---#
     sso_provider: form # form | saml | oidc
@@ -119,12 +119,11 @@ common:
     auth:
       application_auth_secret_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
       default_admin_password: "" # generate
-    
+
     main:
       application_main_secret_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
       secrets_master_key: "" # should be fernet key:>  openssl rand 32 | openssl base64 -A | tr '+/' '-_'
 
-    
     #--- SSO secrets ---#
 
     #--- OIDC Secrets ---#
@@ -133,7 +132,6 @@ common:
     # client_secret: "3gLfgxxxxxxxxxxxxx3sSusbcf"
 
     #--- SAML keys/certs: see saml_existing_secret at the top ---#
-
 
 #--- Pylons Configs ---#
 pylon_auth:
@@ -203,7 +201,6 @@ internal_repo:
     limits:
       cpu: "500m"
       memory: "512Mi"
-
 
 redis:
   name_prefix: "redis"
@@ -290,7 +287,7 @@ pylon_deepwiki:
     # TTL for completed Jobs (seconds)
     # Jobs are auto-deleted after this time to prevent accumulation
     ttlSecondsAfterFinished: 300
-  
+
     # Job resource configuration
     resources:
       requests:

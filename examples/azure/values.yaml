@@ -1,5 +1,6 @@
+---
 # AKS + Application Gateway Ingress Controller + External Secrets Operator (see externalsecret.yaml)
-#   helm install elitea oci://ghcr.io/<org>/charts/elitea --version <version> -n elitea -f values.yaml
+#   helm install elitea oci://ghcr.io/eliteaai/charts/elitea --version <version> -n elitea -f values.yaml
 ingress_enabled: true
 cloud_ingress_type: azure
 

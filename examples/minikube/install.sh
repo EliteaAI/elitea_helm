@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Quick start on a local cluster. Usage: ./install.sh [chart] [extra helm args...]
-#   chart: path (default ../../charts) or oci://ghcr.io/<org>/charts/elitea --version <version>
+#   chart: path (default ../../charts) or oci://ghcr.io/eliteaai/charts/elitea --version <version>
 set -euo pipefail
 cd "$(dirname "$0")"
 

@@ -1,3 +1,4 @@
+---
 # Google-managed TLS certificate; DNS for app_host must point to the static IP first.
 apiVersion: networking.gke.io/v1
 kind: ManagedCertificate

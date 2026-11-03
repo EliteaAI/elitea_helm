@@ -46,5 +46,3 @@ terraform.rc
 # helm
 build/
 charts/values_testing.yaml
-
-

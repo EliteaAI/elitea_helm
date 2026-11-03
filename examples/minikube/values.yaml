@@ -1,3 +1,4 @@
+---
 # Local trial on minikube / kind / Docker Desktop: embedded PostgreSQL and Redis, no ingress, small resources.
 # Not for production. Start with: ./install.sh   (creates the secrets and installs the chart)
 #

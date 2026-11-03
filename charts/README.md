@@ -21,7 +21,7 @@ no ingress. Secrets are generated on the spot.
 ```bash
 rand() { openssl rand 40 | base64 | tr '/+' '_-'; }
 
-helm install elitea oci://ghcr.io/<org>/charts/elitea --version <version> \
+helm install elitea oci://ghcr.io/eliteaai/charts/elitea --version <version> \
   -n elitea --create-namespace \
   --set common.secrets.auth.application_auth_secret_key="$(rand)" \
   --set common.secrets.auth.default_admin_password="$(rand)" \
@@ -92,7 +92,7 @@ HMAC keys and database passwords are auto-generated and stay stable on upgrade.
 3. Install and point DNS at the load balancer:
 
    ```bash
-   helm install elitea oci://ghcr.io/<org>/charts/elitea --version <version> -n elitea -f prod-values.yaml
+   helm install elitea oci://ghcr.io/eliteaai/charts/elitea --version <version> -n elitea -f prod-values.yaml
    kubectl -n elitea get ingress
    ```
 
@@ -219,7 +219,7 @@ metadata: {name: elitea, namespace: argocd}
 spec:
   project: default
   source:
-    repoURL: ghcr.io/<org>/charts      # OCI; for an HTTP repo use the repo URL and `chart:`
+    repoURL: ghcr.io/eliteaai/charts      # OCI; for an HTTP repo use the repo URL and `chart:`
     chart: elitea
     targetRevision: <version>
     helm:
@@ -352,7 +352,7 @@ Resources, storage and `vpa_enabled` are set per component in `values.yaml`, whi
 ## Upgrade / uninstall
 
 ```bash
-helm upgrade elitea oci://ghcr.io/<org>/charts/elitea --version <new> -n elitea -f prod-values.yaml
+helm upgrade elitea oci://ghcr.io/eliteaai/charts/elitea --version <new> -n elitea -f prod-values.yaml
 helm uninstall elitea -n elitea       # PVCs (databases, storage) are kept; delete them explicitly if needed
 ```
 

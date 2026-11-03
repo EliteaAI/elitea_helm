@@ -1,3 +1,4 @@
+---
 name: Release
 
 # Push a tag equal to the chart version: git tag v2.0.8 && git push origin v2.0.8

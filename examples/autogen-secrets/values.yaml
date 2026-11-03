@@ -1,3 +1,4 @@
+---
 # The chart generates the HMAC keys and the embedded PostgreSQL / Redis passwords for you.
 # They are created on the first install and reused on every `helm upgrade` (read back from the cluster
 # with `lookup`). You only provide the 4 encryption keys, on the command line, so they never sit in a file:

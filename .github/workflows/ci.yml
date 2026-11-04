@@ -110,4 +110,4 @@ jobs:
       - name: PR title is a conventional commit
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: cz check --message "$PR_TITLE"
+        run: '"$RUNNER_TEMP/cz/bin/cz" check --message "$PR_TITLE"'

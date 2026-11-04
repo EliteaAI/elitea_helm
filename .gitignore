@@ -5,6 +5,7 @@
 .claude
 CL*.md
 AG*.md
+RE*.md
 
 # .tfstate files
 *.tfstate

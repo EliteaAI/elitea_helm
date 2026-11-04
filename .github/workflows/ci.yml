@@ -12,13 +12,21 @@ permissions:
 
 # Runner: repository variable RUNNER_LABELS, e.g. ["self-hosted","linux","x64"]; GitHub-hosted if unset.
 # The self-hosted image has curl, git, jq, trivy, grype but no helm: it is installed by setup-helm below.
-# Fork PRs never run on it: untrusted code must not reach a self-hosted runner.
+# Fork PRs run on GitHub-hosted runners only (untrusted code must not reach the self-hosted one),
+# so the required checks still run for them. Missing tools (trivy) are installed on the fly.
 jobs:
   lint:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') }}
+    # yamllint disable-line rule:line-length
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
+      - name: Trivy (install if missing)
+        run: |
+          command -v trivy >/dev/null || {
+            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.76.1/contrib/install.sh | sh -s -- -b "$RUNNER_TEMP/bin" v0.76.1
+            echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          }
+
       - uses: azure/setup-helm@v5
         with:
           version: v4.3.1
@@ -69,27 +77,37 @@ jobs:
           fi
 
   secret-scan:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') }}
+    # yamllint disable-line rule:line-length
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
-      - name: Trivy secret scan
+      - name: Trivy (install if missing)
         run: |
-          command -v trivy >/dev/null || curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b "$RUNNER_TEMP"
-          export PATH="$RUNNER_TEMP:$PATH"
-          trivy fs --scanners secret --exit-code 1 .
+          command -v trivy >/dev/null || {
+            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.76.1/contrib/install.sh | sh -s -- -b "$RUNNER_TEMP/bin" v0.76.1
+            echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          }
+
+      - name: Trivy secret scan
+        run: trivy fs --scanners secret --exit-code 1 .
 
   commits:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') }}
+    if: github.event_name == 'pull_request'
+    # yamllint disable-line rule:line-length
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
+      # system python3 + venv: setup-python has no builds for the Debian self-hosted runner
       - name: Conventional commits
         run: |
-          pip install commitizen
-          cz check --rev-range "origin/${{ github.base_ref }}..HEAD"
+          python3 -m venv "$RUNNER_TEMP/cz"
+          "$RUNNER_TEMP/cz/bin/pip" install commitizen
+          "$RUNNER_TEMP/cz/bin/cz" check --rev-range "origin/${{ github.base_ref }}..HEAD"
+
+      # with squash merge the PR title becomes the commit on main (and feeds CHANGELOG / version bump)
+      - name: PR title is a conventional commit
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: '"$RUNNER_TEMP/cz/bin/cz" check --message "$PR_TITLE"'

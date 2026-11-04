@@ -28,7 +28,9 @@ Helm chart for the EliteA AI platform (Pylon microservices) on Kubernetes (EKS, 
 
 ```bash
 minikube start --cpus 6 --memory 16g --disk-size 60g
+
 ./examples/minikube/install.sh               # generates secrets, installs with small local values
+
 kubectl -n elitea port-forward svc/pylon-main-svc 8080:8080     # http://localhost:8080
 ```
 
@@ -51,9 +53,15 @@ Each folder has `values.yaml` (load balancer, TLS, StorageClasses, `existingSecr
 
 ```bash
 kubectl create namespace elitea
+
 kubectl apply -f examples/aws/externalsecret.yaml          # wait for STATUS SecretSynced
-helm install elitea ./charts -n elitea -f examples/aws/values.yaml
+
+helm install elitea oci://ghcr.io/eliteaai/charts/elitea --version <version> \
+  -n elitea -f examples/aws/values.yaml
 ```
+
+Versions are listed on the [Releases](../../releases) page. To inspect the chart first:
+`helm pull oci://ghcr.io/eliteaai/charts/elitea --version <version> --untar`.
 
 Replace the placeholders (domain, certificate, project/vault/region names) first.
 
@@ -65,7 +73,8 @@ Targets take `NS` (namespace, default `test`), `VALS` (values file under `charts
 ```bash
 make lint NS=elitea                         # helm lint --strict
 make template NS=elitea VALS=prod.yaml      # render to build/render.yaml
-make bump                                   # next version + CHANGELOG + tag
+make bump                                   # next version + CHANGELOG (files only, commit in a release PR)
+make tag                                    # tag v<chart version> after the release PR is merged
 ```
 
 With the default `VALS`, `make lint` and `make template` add `charts/ci/test-values.yaml` (dummy secrets).

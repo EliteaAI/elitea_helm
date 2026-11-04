@@ -1,4 +1,4 @@
-.PHONY: lint template bump help
+.PHONY: lint template bump tag help
 
 CHART=charts
 NS ?= test
@@ -14,7 +14,8 @@ help: ## Show this help
 	@echo "Available targets:"
 	@echo "  lint          - Lint the helm chart 'make lint NS=test"
 	@echo "  template      - Template the helm chart"
-	@echo "  bump          - Bump version + CHANGELOG + tag from commits (commitizen)"
+	@echo "  bump          - Bump version + CHANGELOG from commits (commitizen), no commit/tag: open a release PR"
+	@echo "  tag           - Tag the current commit with the chart version (after the release PR is merged)"
 	@echo "  help          - Show this help message"
 
 lint:
@@ -26,5 +27,8 @@ template: ## Template the helm chart
 	@mkdir -p "build/"
 	@helm template --debug "$(RELEASE)" "$(CHART)" -n "$(NS)" -f "$(CHART)/$(VALS)" $(CI_VALS) --kube-version "$(KUBE)" > "$(OUT)"
 
-bump: ## Bump chart version from conventional commits, update CHANGELOG, create tag (then: git push --follow-tags)
-	@uv run cz bump
+bump: ## Bump chart version + CHANGELOG from conventional commits (files only: commit them on a release branch, open a PR)
+	@uv run cz bump --files-only
+
+tag: ## Tag the current commit v<chart version>; then: git push origin v<version> (triggers the release workflow)
+	@v=$$(sed -n 's/^version: *//p' "$(CHART)/Chart.yaml" | tr -d '"'); git tag "v$$v" && echo "created v$$v, now: git push origin v$$v"

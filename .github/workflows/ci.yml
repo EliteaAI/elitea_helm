@@ -99,15 +99,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      # system python3 + venv: setup-python has no builds for the Debian self-hosted runner
+      # uv is preinstalled on the runner (no python venv/pip there)
       - name: Conventional commits
         run: |
-          python3 -m venv "$RUNNER_TEMP/cz"
-          "$RUNNER_TEMP/cz/bin/pip" install commitizen
-          "$RUNNER_TEMP/cz/bin/cz" check --rev-range "origin/${{ github.base_ref }}..HEAD"
+          uvx --from commitizen cz check --rev-range "origin/${{ github.base_ref }}..HEAD"
 
       # with squash merge the PR title becomes the commit on main (and feeds CHANGELOG / version bump)
       - name: PR title is a conventional commit
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: '"$RUNNER_TEMP/cz/bin/cz" check --message "$PR_TITLE"'
+        run: 'uvx --from commitizen cz check --message "$PR_TITLE"'

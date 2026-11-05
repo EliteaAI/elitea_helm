@@ -10,6 +10,17 @@ Helm chart for the EliteA AI platform (Pylon microservices) on Kubernetes (EKS, 
 **Documentation for users of the chart (install, secrets, External Secrets, Argo CD, load balancers, SSO, CA):
 [charts/README.md](charts/README.md).**
 
+
+## Requirements
+
+| Component | CPU | RAM | PVC | TMP |
+| --- | --- | --- | --- | --- |
+| `pylon_auth` | 1 | 512Mi | 1Gi | - |
+| `pylon_main` | 2 | 6Gi | 25Gi | 20Gi |
+| `pylon_indexer` | 6 | 12Gi | 100Gi | 20Gi |
+
+CPU and RAM are requests = limits per pod. Indexer sizing (CPU, RAM, PVC) depends on your workload: adjust to available resources.
+
 ## Components
 
 | Component | Template directory | Enabled by |
@@ -35,6 +46,56 @@ kubectl -n elitea port-forward svc/pylon-main-svc 8080:8080     # http://localho
 ```
 
 The default StorageClass is `premium-rwo` (GKE): override `*.storage.class` / `*.persistence.storageClass` elsewhere. Real secrets, StorageClasses and cloud load balancers are covered in [charts/README.md](charts/README.md).
+
+## Key variables
+
+Set these in `common.config` (see [charts/values.yaml](charts/values.yaml)). Wrong values here make the platform misbehave (broken login/cookies, wrong redirects, no DB/Redis connection).
+
+| Variable | Default | Set it when |
+| --- | --- | --- |
+| `app_host` | `localhost` | **Always**: must match your public DNS name or IP. |
+| `app_proto` | `http` | Set `https` if ingress or service uses TLS. |
+| `cookies_secure` | `"false"` | Set `"true"` together with `app_proto: https`. |
+| `cookies_lifetime` | `604800` | Session lifetime in seconds (e.g. `7200` = 2 h). |
+| `postgres_host` / `postgres_port` | empty / `5432` | External PostgreSQL (`embedded_services_pgsql` off). |
+| `postgres_db` | `eliteadb` | The database must exist **before** `helm install`. |
+| `redis_host` / `redis_port` | empty / `6379` | External Redis (`embedded_services_redis` off). |
+| `redis_ssl` | `"false"` | Set `"true"` for TLS Redis (port usually `6380`). |
+| `ai_project_allowed_domains` | `centry.user` | Adjust to the user domains allowed to create AI projects and login. |
+
+`debug` (`"false"`) and `sandbox_timeout_seconds` (`30`) are optional tuning.
+
+### Secrets
+
+Set in `common.secrets.*`, or put them all in your own Secret via `common.existingSecret`.
+
+| Key | Generate with | Notes |
+| --- | --- | --- |
+| `auth.application_auth_secret_key` | `openssl rand 40 \| base64 \| tr '/+' '_-'` | **Required. Never change after first install.** |
+| `main.application_main_secret_key` | same | **Required. Never change after first install.** |
+| `main.secrets_master_key` | `openssl rand 32 \| openssl base64 -A \| tr '+/' '-_'` | **Required.** Must be a Fernet key. Never change after install. |
+| `auth.default_admin_password` | any strong password | Initial admin password. |
+| `postgres_user` / `postgres_password` | - | Must exist in PostgreSQL before `helm install`. |
+| `redis_password` | - | Leave empty if Redis is not password protected. |
+| `hmacs.*` (`rpc`, `event`, `exposure`, `indexer`, `mesh`) | same as above | Auto-generated when `hmac_auto_generate: true` (default). Not available under `helm template`/Argo CD: set them explicitly there. |
+
+## Deployment time
+
+Deployment may take **up to 10 min**, there is pods dependcies to make proper order of starting pylons, seeding  db and initial bootstrap.
+
+```mermaid
+flowchart LR
+    pg[(PostgreSQL)] --> auth[pylon_auth]
+    redis[(Redis)] --> auth
+    auth --> main[pylon_main]
+    auth --> indexer[pylon_indexer]
+    main -.-> deepwiki[pylon_deepwiki]
+    main -.-> inventory[pylon_inventory]
+    indexer -.-> inventory
+```
+
+Each pod waits for its dependencies in init containers (`wait-postgres`, `wait-redis`, `wait-auth`, `wait-main`, `wait-indexer`).
+`pylon_main` and `pylon_indexer` start in parallel once `pylon_auth` is ready. Dotted arrows are optional components.
 
 ## Examples (values + External Secrets per cloud)
 

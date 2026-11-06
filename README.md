@@ -10,16 +10,52 @@ Helm chart for the EliteA AI platform (Pylon microservices) on Kubernetes (EKS, 
 **Documentation for users of the chart (install, secrets, External Secrets, Argo CD, load balancers, SSO, CA):
 [charts/README.md](charts/README.md).**
 
-
-## Requirements
+## Mininal Requirements
 
 | Component | CPU | RAM | PVC | TMP |
 | --- | --- | --- | --- | --- |
 | `pylon_auth` | 1 | 512Mi | 1Gi | - |
 | `pylon_main` | 2 | 6Gi | 25Gi | 20Gi |
-| `pylon_indexer` | 6 | 12Gi | 100Gi | 20Gi |
+| `pylon_indexer` | 6 | 12Gi | 40Gi | 20Gi |
+| `redis` | 1 | 512Mi | 1Gi | - |
+| `postgresql` | 4 | 16Gi | 250Gi | - |
+| `pylon_deepwiki` | 1 | 1Gi | 20Gi | 30Gi |
+| `deepwiki_worker` | 2 | 2Gi | - | - |
+| `pylon_imagegen` | 500m | 1Gi | 20Gi | 10Gi |
+| `pylon_inventory` | 1 | 1Gi | 50Gi | 30Gi |
+| `inventory_worker` | 2 | 2Gi | - | - |
 
 CPU and RAM are requests = limits per pod. Indexer sizing (CPU, RAM, PVC) depends on your workload: adjust to available resources.
+
+## Recomended Requirements
+
+| Component | CPU | RAM | PVC | TMP |
+| --- | --- | --- | --- | --- |
+| `pylon_auth` | 1 | 1Gi | 1Gi | - |
+| `pylon_main` | 4 | 12Gi | 60Gi | 20Gi |
+| `pylon_indexer` | 4 | 20Gi | 100Gi | 20Gi |
+| `redis` | 1 | 512Mi | 1Gi | - |
+| `postgresql` | 4 | 24Gi | 250Gi | - |
+| `pylon_deepwiki` | 1 | 1Gi | 20Gi | 30Gi |
+| `deepwiki_worker` | 4 | 8Gi | - | - |
+| `pylon_imagegen` | 500m | 1Gi | 20Gi | 10Gi |
+| `pylon_inventory` | 1 | 1Gi | 50Gi | 30Gi |
+| `inventory_worker` | 4 | 8Gi | - | - |
+
+## Production Requirements ( 1000 users and more)
+
+| Component | CPU | RAM | PVC | TMP |
+| --- | --- | --- | --- | --- |
+| `pylon_auth` | 2 | 2Gi | 1Gi | - |
+| `pylon_main` | 6 | 32Gi | 80Gi | 20Gi |
+| `pylon_indexer` | 6 | 30Gi | 100Gi | 20Gi |
+| `redis` | 2 | 6Gi | 1Gi | - |
+| `postgresql` | use Cloud SQL 16vCPU, 128 GB RAM, 250 GB SSD |
+| `pylon_deepwiki` | 2 | 4Gi | 20Gi | 30Gi |
+| `deepwiki_worker` | 4 | 8Gi | - | - |
+| `pylon_imagegen` | 1 | 1Gi | 20Gi | 10Gi |
+| `pylon_inventory` | 2 | 4Gi | 50Gi | 30Gi |
+| `inventory_worker` | 4 | 8Gi | - | - |
 
 ## Components
 

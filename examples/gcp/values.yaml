@@ -10,29 +10,277 @@ ingress:
     networking.gke.io/managed-certificates: elitea-cert             # see managedcertificate.yaml
     kubernetes.io/ingress.allow-http: "false"
 
+#--- Embedded PGSLQ/Redis ---#
+embedded_services_redis: true
+embedded_services_pgsql: true
+
+redis_queue_random_suffix: xEd34
+pylons_mesh_enabled: false
+autocreate_db: true
+hmac_auto_generate: true
+tracing_enabled: false
+
+#--- Proxy settings ---#
+external_proxy_enabled: false
+http_proxy: "proxy.example.com"
+https_proxy: "proxy.example.com"
+no_proxy: "localhost"
+
+#--- External CA ---#
+external_ca_enabled: false
+external_ca_configmap: ""
+external_ca_files: []
+
 common:
-  existingSecret: elitea-secrets          # created by externalsecret.yaml
+  existingSecret: elitea-secrets
+
   config:
     app_proto: https
     app_host: elitea.example.com
     cookies_secure: "true"
+    ai_project_allowed_domains: "centry.user,yourdomain.com"
+    sso_provider: form # form | saml | oidc
 
-# premium-rwo / standard-rwo are built-in GKE StorageClasses
-pylon_main:
-  storage: {class: premium-rwo, size: 50Gi, tmp_size: 20Gi}
+#--- Pylons Configs ---#
 pylon_auth:
-  storage: {class: premium-rwo, size: 1Gi}
-pylon_indexer:
-  storage: {class: premium-rwo, size: 50Gi, tmp_size: 20Gi}
-postgresql:
-  persistence: {storageClass: premium-rwo, size: 100Gi}
-redis:
-  persistence: {storageClass: premium-rwo, size: 1Gi}
+  name_prefix: pylon-auth
+  log_level: info
 
-# Managed services instead of embedded ones (Cloud SQL + Memorystore):
-# embedded_services_pgsql: false
-# embedded_services_redis: false
-# common:
-#   config:
-#     postgres_host: 10.0.0.5
-#     redis_host: 10.0.0.6
+  storage:
+    class: "premium-rwo"
+    size: "1Gi"
+
+  resources:
+    vpa_enabled: false
+    mode: "Off" # "Off" | "Auto" | "Initial" | "Recreate" | "InPlace" | "InPlaceOrRecreate"
+    requests:
+      cpu: "1"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "512Mi"
+
+pylon_main:
+  name_prefix: pylon-main
+  log_level: info
+
+  storage:
+    class: "premium-rwo"
+    size: "50Gi"
+    tmp_size: "20Gi"
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "2"
+      memory: "6Gi"
+    limits:
+      cpu: "2"
+      memory: "6Gi"
+
+pylon_indexer:
+  name_prefix: pylon-indexer
+  log_level: info
+
+  storage:
+    class: "premium-rwo"
+    size: "200Gi"
+    tmp_size: "20Gi"
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "6"
+      memory: "20Gi"
+    limits:
+      cpu: "6"
+      memory: "20Gi"
+
+internal_repo:
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+redis:
+  name_prefix: "redis"
+  max_memory: "450mb"
+  maxmemory_policy: "allkeys-lru"
+  port: 6379
+
+  persistence:
+    size: 1Gi
+    accessMode: ReadWriteOnce
+    storageClass: "premium-rwo"
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "1"
+      memory: "512Mi"
+    limits:
+      cpu: "2"
+      memory: "512Mi"
+
+postgresql:
+  name_prefix: "pg"
+  port: 5432
+
+  persistence:
+    size: 250Gi
+    accessMode: ReadWriteOnce
+    storageClass: "premium-rwo"
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+
+    tmpfs:
+      enabled: true
+      size: 2Gi
+
+    requests:
+      cpu: "4"
+      memory: "28Gi"
+    limits:
+      cpu: "4"
+      memory: "28Gi"
+
+pylon_deepwiki:
+  enabled: false
+  log_level: info
+  name_prefix: pylon-deepwiki
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "1"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+  storage:
+    class: "premium-rwo"
+    size: "50Gi"
+    tmp_size: "30Gi"
+
+  configs:
+    basePath: /data/wiki_builder
+    version: "main"
+
+    # Autoregistration with AI/Run platform (optional)
+    aiRunPlatform:
+      token: ""         # Bearer token for authentication
+      verify: false     # Verify SSL certificates
+      timeout: 120      # HTTP timeout (seconds) for registration request
+      delay: 15          # Delay (seconds) before registration attempt
+      project_id: 1
+
+  jobs:
+    enabled: true  # Set to true to enable Jobs-based scaling
+    # Maximum concurrent Jobs cluster-wide
+    maxConcurrentJobs: 3
+    # TTL for completed Jobs (seconds)
+    # Jobs are auto-deleted after this time to prevent accumulation
+    ttlSecondsAfterFinished: 300
+
+    # Job resource configuration
+    resources:
+      requests:
+        cpu: "2"
+        memory: "2Gi"
+
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+
+pylon_imagegen:
+  enabled: false
+  log_level: info
+  name_prefix: pylon-imagegen
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "200m"
+      memory: "128Mi"
+    limits:
+      cpu: "1"
+      memory: "256Mi"
+
+  storage:
+    class: "premium-rwo"
+    size: "50Gi"
+    tmp_size: "30Gi"
+
+  configs:
+
+    aiRunPlatform:
+      # JWT token for registration (consider using --set at install time to avoid committing)
+      token: ""
+      # Default bucket for storing generated images (overridable per-request)
+      verify: false     # Verify SSL certificates
+      timeout: 120      # HTTP timeout (seconds) for registration request
+      delay: 15          # Delay (seconds) before registration attempt
+      project_id: 1
+    imageBucket: "imagelibrary"
+
+pylon_inventory:
+  enabled: false
+  name_prefix: pylon-inventory
+  log_level: info
+
+  resources:
+    vpa_enabled: false
+    mode: "Off"
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+  storage:
+    class: "premium-rwo"
+    size: "50Gi"
+    tmp_size: "30Gi"
+
+  configs:
+    basePath: /data/inventory
+    version: "main"
+    aiRunPlatform:
+      token: "" #  should be empty
+      # Default bucket for storing generated images (overridable per-request)
+      verify: false     # Verify SSL certificates
+      timeout: 120      # HTTP timeout (seconds) for registration request
+      delay: 15          # Delay (seconds) before registration attempt
+      project_id: 2
+
+  jobs:
+    enabled: true  # Set to true to enable Jobs-based scaling
+    # Maximum concurrent Jobs cluster-wide
+    maxConcurrentJobs: 3
+    # TTL for completed Jobs (seconds)
+    # Jobs are auto-deleted after this time to prevent accumulation
+    ttlSecondsAfterFinished: 300
+
+    resources:
+      requests:
+        cpu: "2"
+        memory: "2Gi"
+
+      limits:
+        cpu: "4"
+        memory: "8Gi"

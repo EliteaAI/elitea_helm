@@ -353,7 +353,7 @@ Resources, storage and `vpa_enabled` are set per component in `values.yaml`, whi
 
 ```bash
 helm upgrade elitea oci://ghcr.io/eliteaai/charts/elitea --version <new> -n elitea -f prod-values.yaml
-helm uninstall elitea -n elitea       # PVCs (databases, storage) are kept; delete them explicitly if needed
+helm uninstall elitea -n elitea       # PVCs (databases, storage) will be deleted as well
 ```
 
 Before upgrading read the release notes. Never change the `auth` / `main` secret keys.

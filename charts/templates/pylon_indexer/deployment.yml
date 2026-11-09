@@ -323,11 +323,25 @@ spec:
 
       {{- end }}
       {{- end }}
+      {{- include "elitea.tolerations" . | nindent 6 }}
       containers:
         - name: {{ $pi.name_prefix }}
           image: {{ .Values.common.tools_enabled | default false | ternary (printf "%s-tools" .Values.common.image) .Values.common.image }}
           imagePullPolicy: Always
           env:
+            {{- if .Values.common.config.github_auth }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pi.name_prefix) }}
+                  key: github_token
+
+            - name: GITHUB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pi.name_prefix) }}
+                  key: github_user
+            {{- end }}
 
             - name: POSTGRES_HOST
               valueFrom:

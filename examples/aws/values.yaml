@@ -38,6 +38,7 @@ common:
   existingSecret: elitea-secrets          # created by externalsecret.yaml
 
   config:
+    github_auth: false  # true: also add key github_token to the secret (see ../secret-keys.json)
     app_proto: https
     app_host: elitea.example.com
     cookies_secure: "true"

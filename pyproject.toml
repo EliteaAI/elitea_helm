@@ -20,7 +20,7 @@ dev = [
 [tool.commitizen]
 name = "cz_conventional_commits"
 version_provider = "commitizen"
-version = "2.0.7"
+version = "1.0.0"
 tag_format = "v$version"
 version_scheme = "semver"
 update_changelog_on_bump = true

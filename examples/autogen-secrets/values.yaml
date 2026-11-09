@@ -19,10 +19,13 @@ hmac_auto_generate: true              # default; empty hmacs below are filled in
 
 common:
   config:
+    github_auth: false  # true: set secrets.github_token below
     app_host: localhost
   secrets:
     postgres_password: ""             # empty = generated (embedded PostgreSQL)
     redis_password: ""                # empty = generated (embedded Redis)
+    github_user: ""
+    github_token: ""                  # needed only when config.github_auth: true
     hmacs:
       rpc_hmac_key: ""
       event_hmac_key: ""

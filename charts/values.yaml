@@ -40,6 +40,14 @@ external_ca_files: [] # file names inside that ConfigMap, e.g. [corp-ca.crt]
 saml_existing_secret: ""
 saml_idp_use_metadata: false
 
+# Pod tolerations applied to every EliteA pod (empty by default), e.g.:
+#   tolerations:
+#     - key: dedicated
+#       operator: Equal
+#       value: elitea
+#       effect: NoSchedule
+tolerations: []
+
 common:
   name_prefix: elitea
   image: "ghcr.io/eliteaai/pylon:1.2.28"
@@ -66,6 +74,7 @@ common:
     app_host: "localhost"  # public URL domain or IP
     debug: "false"  # set to true to enable debug logging
     sandbox_timeout_seconds: "30" # default 30
+    github_auth: false
 
     redis_host: ""  # redis domain or IP when NOT embedded
     redis_port: "6379"  # redis port, 6380 for ssl
@@ -114,6 +123,10 @@ common:
       exposure_hmac_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
       indexer_hmac_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
       mesh_hmac_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
+
+    #--- GitHub (used when common.config.github_auth: true; become $GITHUB_USER / $GITHUB_TOKEN) ---#
+    github_user: ""
+    github_token: ""
 
     #--- Pylon auth --- encryption keys: must be set by you and NEVER changed after first install ---#
     auth:

@@ -60,6 +60,7 @@ spec:
               until curl -fsS --max-time 5 "$HEALTH" >/dev/null; do
                 sleep 3
               done
+      {{- include "elitea.tolerations" . | nindent 6 }}
       containers:
         - name: otel-collector
           image: {{ .Values.common.images.otel_collector }}

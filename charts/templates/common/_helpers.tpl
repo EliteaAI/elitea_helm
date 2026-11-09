@@ -86,3 +86,11 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- define "elitea.secretName" -}}
 {{- .root.Values.common.existingSecret | default (printf "%s-secret" .prefix) -}}
 {{- end -}}
+
+{{/* Pod tolerations from .Values.tolerations (empty by default). Usage: {{- include "elitea.tolerations" . | nindent 6 }} */}}
+{{- define "elitea.tolerations" -}}
+{{- with .Values.tolerations }}
+tolerations:
+{{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}

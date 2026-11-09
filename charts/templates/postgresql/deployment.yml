@@ -34,6 +34,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
 
+      {{- include "elitea.tolerations" . | nindent 6 }}
       containers:
         - name: postgres
           image: {{ .Values.common.images.postgres }}

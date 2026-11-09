@@ -8,6 +8,7 @@ ingress_enabled: false
 common:
   existingSecret: elitea-secrets          # created by install.sh
   config:
+    github_auth: false  # true: also add key github_token to the secret (see ../secret-keys.json)
     app_proto: http
     app_host: localhost
     cookies_secure: "false"

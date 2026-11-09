@@ -318,12 +318,26 @@ spec:
               until curl -fsS --max-time 5 "$HEALTH" >/dev/null; do
                 sleep 3
               done
+      {{- include "elitea.tolerations" . | nindent 6 }}
       containers:
         - name: {{ $pg.name_prefix }}
           image: {{ .Values.common.image }}
           imagePullPolicy: IfNotPresent
 
           env:
+            {{- if .Values.common.config.github_auth }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pg.name_prefix) }}
+                  key: github_token
+
+            - name: GITHUB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pg.name_prefix) }}
+                  key: github_user
+            {{- end }}
           {{- if .Values.external_proxy_enabled }}
             - name: http_proxy
               value: "{{ .Values.http_proxy }}"

@@ -41,7 +41,7 @@ cat <<MSG
 Wait for the pods (first start pulls big images, can take 10+ minutes):
   microk8s kubectl -n $NS get pods -w
 Then open the UI:
-  microk8s kubectl -n $NS port-forward svc/pylon-main-svc 8080:8080     # http://localhost:8080
+  microk8s kubectl -n $NS port-forward svc/pylon-main-svc 80:8080     # http://localhost:80
 Admin password later: microk8s kubectl -n $NS get secret elitea-secrets -o jsonpath='{.data.default_admin_password}' | base64 -d
 Clean up: microk8s helm -n $NS uninstall $RELEASE && microk8s kubectl delete namespace $NS
 MSG

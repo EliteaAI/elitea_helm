@@ -36,7 +36,7 @@ cat <<MSG
 Wait for the pods (first start pulls big images, can take 10+ minutes):
   kubectl -n $NS get pods -w
 Then open the UI:
-  kubectl -n $NS port-forward svc/pylon-main-svc 8080:8080     # http://localhost:8080
+  kubectl -n $NS port-forward svc/pylon-main-svc 80:8080     # http://localhost:80
 Admin password later: kubectl -n $NS get secret elitea-secrets -o jsonpath='{.data.default_admin_password}' | base64 -d
 Clean up: helm -n $NS uninstall $RELEASE && kubectl delete namespace $NS
 MSG

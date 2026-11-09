@@ -78,7 +78,7 @@ minikube start --cpus 6 --memory 16g --disk-size 60g
 
 ./examples/minikube/install.sh               # generates secrets, installs with small local values
 
-kubectl -n elitea port-forward svc/pylon-main-svc 8080:8080     # http://localhost:8080
+kubectl -n elitea port-forward svc/pylon-main-svc 80:8080     # http://localhost:80
 ```
 
 The default StorageClass is `premium-rwo` (GKE): override `*.storage.class` / `*.persistence.storageClass` elsewhere. Real secrets, StorageClasses and cloud load balancers are covered in [charts/README.md](charts/README.md).

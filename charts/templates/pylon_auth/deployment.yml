@@ -280,12 +280,26 @@ spec:
 
       {{- end }}
       {{- end }}
+      {{- include "elitea.tolerations" . | nindent 6 }}
       containers:
         - name: {{ $pa.name_prefix }}
           image: {{ .Values.common.image }}
           imagePullPolicy: Always
 
           env:
+            {{- if .Values.common.config.github_auth }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: github_token
+
+            - name: GITHUB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
+                  key: github_user
+            {{- end }}
           {{- if .Values.external_proxy_enabled }}
 
             - name: http_proxy

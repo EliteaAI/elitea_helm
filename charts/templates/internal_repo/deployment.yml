@@ -42,6 +42,7 @@ spec:
         - name: {{ $pre }}-internal-tmp
           emptyDir: {}
 
+      {{- include "elitea.tolerations" . | nindent 6 }}
       containers:
         - name: internal-repo
           image: {{ .Values.common.images.internal_repo }}

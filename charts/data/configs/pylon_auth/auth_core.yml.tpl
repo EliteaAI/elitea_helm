@@ -1,4 +1,4 @@
-{{- $sso := (default "form" .Values.common.sso_provider | lower) -}}
+{{- $sso := (default "form" .Values.common.config.sso_provider | lower) -}}
 
 ---
 db_url: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}

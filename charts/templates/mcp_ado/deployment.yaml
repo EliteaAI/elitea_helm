@@ -66,20 +66,20 @@ spec:
             - name: PERSONAL_ACCESS_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ $mcp.name_prefix }}-secret
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $mcp.name_prefix) }}
                   key: personal_access_token
             {{- if $legacyApiKeyEnabled }}
             - name: MCP_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ $mcp.name_prefix }}-secret
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $mcp.name_prefix) }}
                   key: mcp_api_key
             {{- end }}
             {{- if $multipleApiKeysEnabled }}
             - name: MCP_API_KEYS
               valueFrom:
                 secretKeyRef:
-                  name: {{ $mcp.name_prefix }}-secret
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" $mcp.name_prefix) }}
                   key: mcp_api_keys
             {{- end }}
             - name: MCP_ALLOWED_HOSTS

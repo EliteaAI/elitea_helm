@@ -68,8 +68,8 @@ spec:
             - name: GRAFANA_SERVICE_ACCOUNT_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.mcp_grafana.name_prefix }}-secret
-                  key: token_secret_key
+                  name: {{ include "elitea.secretName" (dict "root" $ "prefix" .Values.mcp_grafana.name_prefix) }}
+                  key: grafana_service_account_token
             {{- if $mcp.grafana.org_id }}
             - name: GRAFANA_ORG_ID
               value: {{ $mcp.grafana.org_id | quote }}

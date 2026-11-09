@@ -105,10 +105,23 @@ common:
     #
     # saml_issuer: "https://idp.example.com/saml/metadata"
 
+  # ONLY for secrets that come from something other than the chart's externalSecret (Sealed Secrets, Vault Agent,
+  # SOPS, kubectl create secret). For AWS / GCP / Azure secret managers use externalSecret below instead.
   # Name of a Secret you created with ALL the keys below (postgres_user, postgres_password, redis_password,
   # the 5 *_hmac_key, application_auth_secret_key, default_admin_password, application_main_secret_key,
   # secrets_master_key, plus OIDC keys if used). When set, the chart creates no secrets and ignores `secrets:`.
   existingSecret: ""
+
+  # Chart-managed ExternalSecret for AWS Secrets Manager / GCP Secret Manager / Azure Key Vault: ONE JSON secret
+  # with all keys (see examples/secret-keys.json), copied by External Secrets Operator into a Kubernetes Secret.
+  # Needs External Secrets Operator and a (Cluster)SecretStore you created. Do not combine with existingSecret.
+  externalSecret:
+    enabled: false
+    name: elitea-secrets # Secret created by the operator and used by all pods
+    key: "" # secret name in the cloud secret manager, e.g. elitea/prod
+    storeName: "" # SecretStore / ClusterSecretStore name
+    storeKind: ClusterSecretStore # ClusterSecretStore | SecretStore
+    refreshInterval: 1h
 
   secrets:
     #--- PGSQL/Redis ---#
@@ -429,7 +442,7 @@ mcp_grafana:
     url: "http://monitoring-grafana.monitoring.svc.cluster.local:80"
     org_id: "1"
     extra_headers: ""
-    token_secret_key: ""
+    service_account_token: ""  # with existingSecret / externalSecret: key grafana_service_account_token in the Secret
 
   mcp:
     transport: streamable-http
@@ -464,7 +477,7 @@ mcp_ado:
   ado:
     organization: ""
     authentication: pat
-    personal_access_token: ""
+    personal_access_token: ""  # with existingSecret / externalSecret: keys personal_access_token, mcp_api_key, mcp_api_keys (JSON string)
     legacy_api_key_enabled: true
     mcp_api_key: ""
     multiple_api_keys:

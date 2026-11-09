@@ -336,7 +336,7 @@ spec:
                   name: {{ include "elitea.secretName" (dict "root" $ "prefix" $pa.name_prefix) }}
                   key: default_admin_password
 
-            {{- if eq $sso "oidc" -}}
+            {{- if eq $sso "oidc" }}
             - name: AUTHORIZATION_ENDPOINT
               valueFrom:
                 secretKeyRef:

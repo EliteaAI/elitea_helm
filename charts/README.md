@@ -100,19 +100,20 @@ Ready-made per-cloud files (values + External Secrets): `examples/aws`, `example
 
 ## Secrets
 
-Three ways to provide credentials, from simplest to most production-ready:
+Four ways to provide credentials, from simplest to most production-ready:
 
 | Mode | How | Use for |
 |---|---|---|
 | Generated | Leave `postgres_password`, `redis_password` and `common.secrets.hmacs.*` empty (`hmac_auto_generate: true`) | Quick start, dev. Needs cluster access (`lookup`), so not for `helm template` / Argo CD |
 | Values | Set `common.secrets.*` in a values file | Tests. Values end up in the Helm release Secret and usually in git |
-| Existing Secret | `common.existingSecret: <name>` | Production, GitOps, External Secrets |
+| External Secret (chart-managed) | `common.externalSecret.enabled: true` | Production on AWS Secrets Manager / GCP Secret Manager / Azure Key Vault |
+| Existing Secret | `common.existingSecret: <name>` | **Only** for secrets that do not come from `externalSecret` (Sealed Secrets, Vault Agent, SOPS, `kubectl create secret`) |
 
 Rules:
 
 - `common.secrets.auth.*` and `common.secrets.main.*` encrypt data. You must set them (the chart fails otherwise)
   and **must never change them after the first install**.
-- With `existingSecret` the chart creates no secrets and ignores `common.secrets`.
+- With `existingSecret` or `externalSecret` the chart creates no secrets (MCP ones included) and ignores `common.secrets`.
   The Secret must exist before the install and contain these keys:
 
   | Key | Notes |
@@ -122,6 +123,8 @@ Rules:
   | `rpc_hmac_key`, `event_hmac_key`, `exposure_hmac_key`, `indexer_hmac_key`, `mesh_hmac_key` | required, `openssl rand 40 \| base64 \| tr '/+' '_-'` |
   | `application_auth_secret_key`, `default_admin_password` | required |
   | `application_main_secret_key`, `secrets_master_key` | required, `secrets_master_key` is a Fernet key |
+  | `grafana_service_account_token` | only when `mcp_grafana.enabled` |
+  | `personal_access_token`, `mcp_api_key`, `mcp_api_keys` (JSON string) | only when `mcp_ado.enabled` (`mcp_api_key` with the legacy key, `mcp_api_keys` with multiple keys) |
   | `authorization_endpoint`, `client_id`, `client_secret`, `end_session_endpoint`, `metadata_endpoint`, `token_endpoint`, `url_mode`, `userinfo_endpoint`, `sso_token_expiration` | only for `sso_provider: oidc` |
 
 - Missing keys are not detected at render time: the pod fails with `CreateContainerConfigError`.
@@ -180,7 +183,25 @@ spec:
       serviceAccountRef: {name: external-secrets-sa}
 ```
 
-Then the `ExternalSecret` that produces the Secret named in `common.existingSecret`:
+### ExternalSecret created by the chart (AWS / GCP / Azure)
+
+Store all keys as one JSON secret (see `examples/secret-keys.json`), create the `SecretStore` /
+`ClusterSecretStore` above, then in values:
+
+```yaml
+common:
+  externalSecret:
+    enabled: true
+    name: elitea-secrets        # Secret the operator creates, used by all pods
+    key: elitea/prod            # JSON secret name in the cloud secret manager (Azure: letters, digits, dashes only, e.g. elitea-prod)
+    storeName: elitea-store
+    storeKind: SecretStore      # or ClusterSecretStore (default)
+```
+
+### Your own ExternalSecret (advanced, with `existingSecret`)
+
+Only if you must map keys one by one (for example one Key Vault secret per key, see `examples/azure`).
+Create the `ExternalSecret` that produces the Secret named in `common.existingSecret`:
 
 ```yaml
 apiVersion: external-secrets.io/v1

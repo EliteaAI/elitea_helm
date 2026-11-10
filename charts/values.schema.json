@@ -217,6 +217,17 @@
         },
         "existingSecret": {
           "type": "string"
+        },
+        "externalSecret": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "name": {"type": "string"},
+            "key": {"type": "string"},
+            "storeName": {"type": "string"},
+            "storeKind": {"type": "string", "enum": ["ClusterSecretStore", "SecretStore"]},
+            "refreshInterval": {"type": "string"}
+          }
         }
       }
     },
@@ -991,7 +1002,7 @@
             "extra_headers": {
               "type": "string"
             },
-            "token_secret_key": {
+            "service_account_token": {
               "type": "string"
             }
           }

@@ -84,7 +84,12 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 
 {{/* Secret holding app credentials: common.existingSecret, else the per-service chart-managed one. */}}
 {{- define "elitea.secretName" -}}
-{{- .root.Values.common.existingSecret | default (printf "%s-secret" .prefix) -}}
+{{- include "elitea.existingSecret" .root | default (printf "%s-secret" .prefix) -}}
+{{- end -}}
+
+{{/* User-provided Secret name: common.existingSecret, or the one the chart's ExternalSecret creates. Empty = chart-managed. */}}
+{{- define "elitea.existingSecret" -}}
+{{- .Values.common.existingSecret | default (ternary .Values.common.externalSecret.name "" (.Values.common.externalSecret.enabled | default false)) -}}
 {{- end -}}
 
 {{/* Pod tolerations from .Values.tolerations (empty by default). Usage: {{- include "elitea.tolerations" . | nindent 6 }} */}}

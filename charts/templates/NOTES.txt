@@ -15,7 +15,8 @@ Ingress is disabled. To reach the UI locally:
 Check pods:
   kubectl -n {{ .Release.Namespace }} get pods
 
-Admin password: common.secrets.auth.default_admin_password (or the default_admin_password key of common.existingSecret).
+Admin password: common.secrets.auth.default_admin_password (or the default_admin_password key of the Secret from
+common.existingSecret / common.externalSecret).
 IMPORTANT: never change the common.secrets.auth/main keys after the first install.
 {{- if and .Values.hmac_auto_generate }}
 

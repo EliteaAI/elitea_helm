@@ -25,7 +25,6 @@ redis_queue_random_suffix: xEd34
 pylons_mesh_enabled: false
 autocreate_db: true
 tracing_enabled: false
-hmac_auto_generate: false
 
 #--- Proxy settings ---#
 external_proxy_enabled: false
@@ -48,6 +47,7 @@ common:
     sso_provider: form # form | saml | oidc
 
   secrets:
+    hmac_auto_generate: false
     postgres_user: elitea
     postgres_password: CHANGE_ME
     redis_password: CHANGE_ME

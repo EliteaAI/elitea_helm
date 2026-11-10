@@ -18,7 +18,6 @@ redis_aws_cloud: false # set to true if using AWS ElastiCache Redis
 redis_queue_random_suffix: xEd34
 pylons_mesh_enabled: false # set to true to enable pylons mesh
 autocreate_db: true
-hmac_auto_generate: true # true: generate empty common.secrets.hmacs keys (kept stable across upgrades); false: you must set them
 tracing_enabled: false # set to true to enable distributed tracing
 
 #--- Proxy settings ---#
@@ -124,12 +123,13 @@ common:
     refreshInterval: 1h
 
   secrets:
+    hmac_auto_generate: true # true: generate empty hmacs keys (kept stable across upgrades); false: you must set them
     #--- PGSQL/Redis ---#
     redis_password: ""  # redis password, set to empty if not password protected
     postgres_user: "eliteadb"  # postgres user, should be present before helm install
     postgres_password: ""  # postgres password, should be present before helm install
 
-    #--- Pylons hmac keys (see hmac_auto_generate) ---#
+    #--- Pylons hmac keys (see common.secrets.hmac_auto_generate) ---#
     hmacs:
       rpc_hmac_key: "" # >  openssl rand 64 | base64 -w0 | tr '/+' '_-'
       event_hmac_key: "" # > openssl rand 64 | base64 -w0 | tr '/+' '_-'

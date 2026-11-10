@@ -162,6 +162,9 @@
         "secrets": {
           "type": "object",
           "properties": {
+            "hmac_auto_generate": {
+              "type": "boolean"
+            },
             "redis_password": {
               "type": "string"
             },
@@ -1209,9 +1212,6 @@
         "aws",
         "azure"
       ]
-    },
-    "hmac_auto_generate": {
-      "type": "boolean"
     },
     "external_ca_configmap": {
       "type": "string"

@@ -104,7 +104,7 @@ Four ways to provide credentials, from simplest to most production-ready:
 
 | Mode | How | Use for |
 |---|---|---|
-| Generated | Leave `postgres_password`, `redis_password` and `common.secrets.hmacs.*` empty (`hmac_auto_generate: true`) | Quick start, dev. Needs cluster access (`lookup`), so not for `helm template` / Argo CD |
+| Generated | Leave `postgres_password`, `redis_password` and `common.secrets.hmacs.*` empty (`common.secrets.hmac_auto_generate: true`) | Quick start, dev. Needs cluster access (`lookup`), so not for `helm template` / Argo CD |
 | Values | Set `common.secrets.*` in a values file | Tests. Values end up in the Helm release Secret and usually in git |
 | External Secret (chart-managed) | `common.externalSecret.enabled: true` | Production on AWS Secrets Manager / GCP Secret Manager / Azure Key Vault |
 | Existing Secret | `common.existingSecret: <name>` | **Only** for secrets that do not come from `externalSecret` (Sealed Secrets, Vault Agent, SOPS, `kubectl create secret`) |
@@ -113,6 +113,7 @@ Rules:
 
 - `common.secrets.auth.*` and `common.secrets.main.*` encrypt data. You must set them (the chart fails otherwise)
   and **must never change them after the first install**.
+- Keys that must never change (`common.secrets.hmacs.*`, `auth.application_auth_secret_key`, `main.application_main_secret_key`, `main.secrets_master_key`): on `helm upgrade` the value already stored in the cluster always wins over `values.yaml`. To rotate one, delete the Secret first. Needs `lookup`, so not for `helm template` / Argo CD.
 - With `existingSecret` or `externalSecret` the chart creates no secrets (MCP ones included) and ignores `common.secrets`.
   The Secret must exist before the install and contain these keys:
 

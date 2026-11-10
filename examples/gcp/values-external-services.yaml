@@ -17,7 +17,6 @@ embedded_services_pgsql: false
 redis_queue_random_suffix: xEd34
 pylons_mesh_enabled: false
 autocreate_db: true
-hmac_auto_generate: true
 tracing_enabled: false
 
 #--- Proxy settings ---#
@@ -32,6 +31,8 @@ external_ca_configmap: ""
 external_ca_files: []
 
 common:
+  secrets:
+    hmac_auto_generate: true
   existingSecret: elitea-secrets
 
   config:

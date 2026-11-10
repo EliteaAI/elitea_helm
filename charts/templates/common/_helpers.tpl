@@ -33,7 +33,8 @@
 {{- include "elitea.hmacs" . | trim -}}
 {{- if and (not .Values.embedded_services_pgsql) (not .Values.common.secrets.postgres_password) }}{{ fail "common.secrets.postgres_password is required when embedded_services_pgsql is false" }}{{ end -}}
 {{- range $k, $v := .Values.common.secrets }}
-{{- if kindIs "map" $v }}
+{{- if eq $k "hmac_auto_generate" }}
+{{- else if kindIs "map" $v }}
 {{- range $k2, $v2 := $v }}
 {{ $k2 }}: {{ $v2 | quote }}
 {{- end }}
@@ -60,24 +61,18 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- end -}}
 
-{{/* With hmac_auto_generate, fills empty hmacs once per render, reusing the value already stored in the cluster so it stays stable across upgrades. */}}
+{{/* Keys that must never change after install (hmacs, auth, main): a value already stored in the cluster always wins over values.yaml, so `helm upgrade` keeps them. Otherwise empty hmacs are generated when common.secrets.hmac_auto_generate. Needs `lookup` (not available in helm template / Argo CD). */}}
 {{- define "elitea.hmacs" -}}
-{{- if .Values.hmac_auto_generate }}
-{{- $h := .Values.common.secrets.hmacs }}
 {{- $existing := lookup "v1" "Secret" .Release.Namespace (printf "%s-secret" .Values.pylon_main.name_prefix) }}
-{{- range $k := keys $h }}
-{{- if not (index $h $k) }}
-{{- if and $existing (hasKey $existing.data $k) }}
-{{- $_ := set $h $k (index $existing.data $k | b64dec) }}
-{{- else }}
-{{- $_ := set $h $k (randAlphaNum 64) }}
-{{- end }}
-{{- end }}
-{{- end }}
-{{- end }}
 {{- range $group := list "hmacs" "auth" "main" }}
-{{- range $k, $v := index $.Values.common.secrets $group }}
-{{- if not $v }}{{ fail (printf "common.secrets.%s.%s is empty: set it%s" $group $k (ternary " (or enable hmac_auto_generate)" "" (eq $group "hmacs"))) }}{{ end }}
+{{- $g := index $.Values.common.secrets $group }}
+{{- range $k := keys $g }}
+{{- if and $existing $existing.data (hasKey $existing.data $k) }}
+{{- $_ := set $g $k (index $existing.data $k | b64dec) }}
+{{- else if and (eq $group "hmacs") $.Values.common.secrets.hmac_auto_generate (not (index $g $k)) }}
+{{- $_ := set $g $k (randAlphaNum 64) }}
+{{- end }}
+{{- if not (index $g $k) }}{{ fail (printf "common.secrets.%s.%s is empty: set it%s" $group $k (ternary " (or enable common.secrets.hmac_auto_generate)" "" (eq $group "hmacs"))) }}{{ end }}
 {{- end }}
 {{- end }}
 {{- end -}}

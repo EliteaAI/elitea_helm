@@ -113,14 +113,27 @@ common:
 
   # Chart-managed ExternalSecret for AWS Secrets Manager / GCP Secret Manager / Azure Key Vault: ONE JSON secret
   # with all keys (see examples/secret-keys.json), copied by External Secrets Operator into a Kubernetes Secret.
-  # Needs External Secrets Operator and a (Cluster)SecretStore you created. Do not combine with existingSecret.
+  # Needs External Secrets Operator installed in the cluster. Do not combine with existingSecret.
   externalSecret:
     enabled: false
     name: elitea-secrets # Secret created by the operator and used by all pods
     key: "" # secret name in the cloud secret manager, e.g. elitea/prod
-    storeName: "" # SecretStore / ClusterSecretStore name
-    storeKind: ClusterSecretStore # ClusterSecretStore | SecretStore
     refreshInterval: 1h
+
+    # SecretStore: created by the chart (createStore: true) or an existing one you point to.
+    createStore: true
+    storeName: "" # createStore: true -> name of the created store (empty = elitea-store); false -> existing store, required
+    storeKind: ClusterSecretStore # used only when createStore: false (SecretStore | ClusterSecretStore)
+    provider: gcp # gcp | aws | azure, used only when createStore: true
+    serviceAccount: external-secrets-sa # existing SA bound to the cloud identity (Workload Identity / IRSA)
+    gcp:
+      projectID: ""
+      clusterLocation: ""
+      clusterName: ""
+    aws:
+      region: ""
+    azure:
+      vaultUrl: "" # https://<vault>.vault.azure.net
 
   secrets:
     hmac_auto_generate: true # true: generate empty hmacs keys (kept stable across upgrades); false: you must set them

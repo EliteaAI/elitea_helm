@@ -186,8 +186,10 @@ spec:
 
 ### ExternalSecret created by the chart (AWS / GCP / Azure)
 
-Store all keys as one JSON secret (see `examples/secret-keys.json`), create the `SecretStore` /
-`ClusterSecretStore` above, then in values:
+Store all keys as one JSON secret (see `examples/secret-keys.json`). With `enabled: true` the chart creates both the
+`SecretStore` (in the release namespace) and the `ExternalSecret`. You only need External Secrets Operator in the
+cluster and a service account (`serviceAccount`) bound to the cloud identity (Workload Identity / IRSA).
+To use an existing (Cluster)SecretStore instead, set `createStore: false` and `storeName` / `storeKind`:
 
 ```yaml
 common:
@@ -195,8 +197,14 @@ common:
     enabled: true
     name: elitea-secrets        # Secret the operator creates, used by all pods
     key: elitea/prod            # JSON secret name in the cloud secret manager (Azure: letters, digits, dashes only, e.g. elitea-prod)
-    storeName: elitea-store
-    storeKind: SecretStore      # or ClusterSecretStore (default)
+    provider: gcp               # gcp | aws | azure
+    gcp: {projectID: my-project, clusterLocation: europe-west1, clusterName: my-cluster}
+    # aws: {region: eu-central-1}
+    # azure: {vaultUrl: "https://my-vault.vault.azure.net"}
+    # serviceAccount: external-secrets-sa
+    # createStore: false        # use your own store instead:
+    # storeName: my-store
+    # storeKind: ClusterSecretStore
 ```
 
 ### Your own ExternalSecret (advanced, with `existingSecret`)

@@ -120,7 +120,7 @@ Rules:
   |---|---|
   | `postgres_user`, `postgres_password` | required, also used by embedded PostgreSQL |
   | `redis_password` | required, may be empty only if Redis has no password |
-  | `rpc_hmac_key`, `event_hmac_key`, `exposure_hmac_key`, `indexer_hmac_key`, `mesh_hmac_key` | required, `openssl rand 40 \| base64 \| tr '/+' '_-'` |
+  | `rpc_hmac_key`, `event_hmac_key`, `exposure_hmac_key`, `indexer_hmac_key`, `mesh_hmac_key` | required, `openssl rand 64 \| base64 -w0 \| tr '/+' '_-'` |
   | `application_auth_secret_key`, `default_admin_password` | required |
   | `application_main_secret_key`, `secrets_master_key` | required, `secrets_master_key` is a Fernet key |
   | `grafana_service_account_token` | only when `mcp_grafana.enabled` |

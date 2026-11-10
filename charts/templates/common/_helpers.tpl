@@ -70,7 +70,7 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- if and $existing (hasKey $existing.data $k) }}
 {{- $_ := set $h $k (index $existing.data $k | b64dec) }}
 {{- else }}
-{{- $_ := set $h $k (randAlphaNum 54) }}
+{{- $_ := set $h $k (randAlphaNum 64) }}
 {{- end }}
 {{- end }}
 {{- end }}

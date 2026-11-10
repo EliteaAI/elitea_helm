@@ -131,11 +131,11 @@ common:
 
     #--- Pylons hmac keys (see hmac_auto_generate) ---#
     hmacs:
-      rpc_hmac_key: "" # >  openssl rand 40 | base64  | tr '/+' '_-'
-      event_hmac_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
-      exposure_hmac_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
-      indexer_hmac_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
-      mesh_hmac_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
+      rpc_hmac_key: "" # >  openssl rand 64 | base64 -w0 | tr '/+' '_-'
+      event_hmac_key: "" # > openssl rand 64 | base64 -w0 | tr '/+' '_-'
+      exposure_hmac_key: "" # > openssl rand 64 | base64 -w0 | tr '/+' '_-'
+      indexer_hmac_key: "" # > openssl rand 64 | base64 -w0 | tr '/+' '_-'
+      mesh_hmac_key: "" # > openssl rand 64 | base64 -w0 | tr '/+' '_-'
 
     #--- GitHub (used when common.config.github_auth: true; become $GITHUB_USER / $GITHUB_TOKEN) ---#
     github_user: ""

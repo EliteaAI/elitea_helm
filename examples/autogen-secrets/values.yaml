@@ -1,17 +1,10 @@
 ---
-# The chart generates the HMAC keys and the embedded PostgreSQL / Redis passwords for you.
-# They are created on the first install and reused on every `helm upgrade` (read back from the cluster
-# with `lookup`). You only provide the 4 encryption keys, on the command line, so they never sit in a file:
+# The chart generates the HMAC keys, the application / master encryption keys and the embedded PostgreSQL / Redis
+# passwords for you. They are created on the first install and reused on every `helm upgrade` (read back from the
+# cluster with `lookup`). You only provide the admin password, on the command line, so it never sits in a file:
 #
-#   rand() { openssl rand 40 | base64 | tr '/+' '_-'; }
 #   helm install elitea ./charts -n elitea --create-namespace -f examples/autogen-secrets/values.yaml \
-#     --set common.secrets.auth.application_auth_secret_key="$(rand)" \
-#     --set common.secrets.auth.default_admin_password="$(rand)" \
-#     --set common.secrets.main.application_main_secret_key="$(rand)" \
-#     --set common.secrets.main.secrets_master_key="$(openssl rand 32 | openssl base64 -A | tr '+/' '-_')"
-#
-# On upgrade pass the SAME four values again (save them in a password manager: they cannot be changed
-# and the admin password is only known to you).
+#     --set common.secrets.auth.default_admin_password="<admin password>"
 #
 # Limits: needs cluster access, so NOT for `helm template`, Argo CD or Flux (use existingSecret there);
 # deleting the generated Secrets or the namespace generates new keys.
@@ -32,6 +25,11 @@ common:
       exposure_hmac_key: ""
       indexer_hmac_key: ""
       mesh_hmac_key: ""
+    auth:
+      application_auth_secret_key: ""   # empty = generated
+    main:
+      application_main_secret_key: ""   # empty = generated
+      secrets_master_key: ""            # empty = generated (Fernet)
 
 # StorageClass of your cluster (kubectl get sc); the chart default is GKE's premium-rwo
 pylon_main:

@@ -143,7 +143,7 @@ Each pod waits for its dependencies in init containers (`wait-postgres`, `wait-r
 | Local (minikube / kind) | [examples/minikube/](examples/minikube/): `./install.sh` creates secrets and installs |
 | Local (MicroK8s) | [examples/microk8s/](examples/microk8s/): same as minikube with the `microk8s-hostpath` StorageClass |
 | Secrets inside values (tests only) | [examples/inline-secrets/](examples/inline-secrets/) |
-| Auto-generated secrets | [examples/autogen-secrets/](examples/autogen-secrets/): HMAC keys and DB passwords are generated, you pass only the 4 encryption keys |
+| Auto-generated secrets | [examples/autogen-secrets/](examples/autogen-secrets/): HMAC keys, encryption keys and DB passwords are generated, you pass only the admin password |
 
 Each folder has `values.yaml` (load balancer, TLS, StorageClasses, `existingSecret`) and `externalsecret.yaml`
 (`SecretStore` + `ExternalSecret`). [examples/secret-keys.json](examples/secret-keys.json) lists every key the secret must contain.

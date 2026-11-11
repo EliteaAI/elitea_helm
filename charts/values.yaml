@@ -136,7 +136,7 @@ common:
       vaultUrl: "" # https://<vault>.vault.azure.net
 
   secrets:
-    hmac_auto_generate: true # true: generate empty hmacs keys (kept stable across upgrades); false: you must set them
+    hmac_auto_generate: true # true: generate empty keys below once, keep on upgrade (needs lookup); false: set them
     #--- PGSQL/Redis ---#
     redis_password: ""  # redis password, set to empty if not password protected
     postgres_user: "eliteadb"  # postgres user, should be present before helm install
@@ -154,7 +154,7 @@ common:
     github_user: ""
     github_token: ""
 
-    #--- Pylon auth --- encryption keys: must be set by you and NEVER changed after first install ---#
+    #--- Pylon auth --- encryption keys: generated when empty (hmac_auto_generate), NEVER changed after first install ---#
     auth:
       application_auth_secret_key: "" # > openssl rand 40 | base64  | tr '/+' '_-'
       default_admin_password: "" # generate

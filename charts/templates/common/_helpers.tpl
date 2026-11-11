@@ -61,7 +61,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- end -}}
 
-{{/* Keys that must never change after install (hmacs, auth, main): a value already stored in the cluster always wins over values.yaml, so `helm upgrade` keeps them. Otherwise empty hmacs are generated when common.secrets.hmac_auto_generate. Needs `lookup` (not available in helm template / Argo CD). */}}
+{{/* Keys that must never change after install (hmacs, auth, main): a value already stored in the cluster always wins over values.yaml, so `helm upgrade` keeps them. Otherwise empty hmacs and application_auth_secret_key / application_main_secret_key / secrets_master_key (Fernet) are generated when common.secrets.hmac_auto_generate; default_admin_password is never generated. Needs `lookup` (not available in helm template / Argo CD). */}}
 {{- define "elitea.hmacs" -}}
 {{- $existing := lookup "v1" "Secret" .Release.Namespace (printf "%s-secret" .Values.pylon_main.name_prefix) }}
 {{- range $group := list "hmacs" "auth" "main" }}
@@ -69,10 +69,13 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- range $k := keys $g }}
 {{- if and $existing $existing.data (hasKey $existing.data $k) }}
 {{- $_ := set $g $k (index $existing.data $k | b64dec) }}
-{{- else if and (eq $group "hmacs") $.Values.common.secrets.hmac_auto_generate (not (index $g $k)) }}
-{{- $_ := set $g $k (randAlphaNum 64) }}
+{{- else if and $.Values.common.secrets.hmac_auto_generate (not (index $g $k)) (ne $k "default_admin_password") }}
+{{- $v := randAlphaNum 64 }}
+{{- if eq $k "secrets_master_key" }}{{ $v = randAlphaNum 32 | b64enc | replace "+" "-" | replace "/" "_" }}
+{{- else if has $k (list "application_auth_secret_key" "application_main_secret_key") }}{{ $v = randAlphaNum 80 }}{{ end }}
+{{- $_ := set $g $k $v }}
 {{- end }}
-{{- if not (index $g $k) }}{{ fail (printf "common.secrets.%s.%s is empty: set it%s" $group $k (ternary " (or enable common.secrets.hmac_auto_generate)" "" (eq $group "hmacs"))) }}{{ end }}
+{{- if not (index $g $k) }}{{ fail (printf "common.secrets.%s.%s is empty: set it%s" $group $k (ternary "" " (or enable common.secrets.hmac_auto_generate)" (eq $k "default_admin_password"))) }}{{ end }}
 {{- end }}
 {{- end }}
 {{- end -}}

@@ -19,7 +19,7 @@ A throw-away install on a local cluster (kind, minikube, Docker Desktop) with em
 no ingress. Secrets are generated on the spot.
 
 ```bash
-rand() { openssl rand 40 | base64 | tr '/+' '_-'; }
+rand() { openssl rand 60 | base64 | tr '/+' '_-'; }
 
 helm install elitea oci://ghcr.io/eliteaai/charts/elitea --version <version> \
   -n elitea --create-namespace \

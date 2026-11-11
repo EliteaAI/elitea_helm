@@ -18,9 +18,9 @@ Check pods:
 Admin password: common.secrets.auth.default_admin_password (or the default_admin_password key of the Secret from
 common.existingSecret / common.externalSecret).
 IMPORTANT: never change the common.secrets.auth/main keys after the first install.
-{{- if and .Values.hmac_auto_generate }}
+{{- if .Values.common.secrets.hmac_auto_generate }}
 
-hmac_auto_generate is on: keys are generated once and reused on upgrade (needs cluster access).
-With Argo CD / "helm template" set hmac_auto_generate=false and the embedded
+common.secrets.hmac_auto_generate is on: keys are generated once and reused on upgrade (needs cluster access).
+With Argo CD / "helm template" set common.secrets.hmac_auto_generate=false and the embedded
 postgres/redis passwords explicitly, otherwise they change on every render.
 {{- end }}

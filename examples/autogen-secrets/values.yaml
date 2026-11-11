@@ -15,13 +15,13 @@
 #
 # Limits: needs cluster access, so NOT for `helm template`, Argo CD or Flux (use existingSecret there);
 # deleting the generated Secrets or the namespace generates new keys.
-hmac_auto_generate: true              # default; empty hmacs below are filled in
 
 common:
   config:
     github_auth: false  # true: set secrets.github_token below
     app_host: localhost
   secrets:
+    hmac_auto_generate: true
     postgres_password: ""             # empty = generated (embedded PostgreSQL)
     redis_password: ""                # empty = generated (embedded Redis)
     github_user: ""

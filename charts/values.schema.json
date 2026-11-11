@@ -162,6 +162,9 @@
         "secrets": {
           "type": "object",
           "properties": {
+            "hmac_auto_generate": {
+              "type": "boolean"
+            },
             "redis_password": {
               "type": "string"
             },
@@ -226,6 +229,12 @@
             "key": {"type": "string"},
             "storeName": {"type": "string"},
             "storeKind": {"type": "string", "enum": ["ClusterSecretStore", "SecretStore"]},
+            "createStore": {"type": "boolean"},
+            "provider": {"type": "string", "enum": ["gcp", "aws", "azure"]},
+            "serviceAccount": {"type": "string"},
+            "gcp": {"type": "object"},
+            "aws": {"type": "object"},
+            "azure": {"type": "object"},
             "refreshInterval": {"type": "string"}
           }
         }
@@ -1209,9 +1218,6 @@
         "aws",
         "azure"
       ]
-    },
-    "hmac_auto_generate": {
-      "type": "boolean"
     },
     "external_ca_configmap": {
       "type": "string"

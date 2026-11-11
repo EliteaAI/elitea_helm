@@ -19,7 +19,7 @@ A throw-away install on a local cluster (kind, minikube, Docker Desktop) with em
 no ingress. Secrets are generated on the spot.
 
 ```bash
-rand() { openssl rand 40 | base64 | tr '/+' '_-'; }
+rand() { openssl rand 60 | base64 | tr '/+' '_-'; }
 
 helm install elitea oci://ghcr.io/eliteaai/charts/elitea --version <version> \
   -n elitea --create-namespace \
@@ -104,7 +104,7 @@ Four ways to provide credentials, from simplest to most production-ready:
 
 | Mode | How | Use for |
 |---|---|---|
-| Generated | Leave `postgres_password`, `redis_password` and `common.secrets.hmacs.*` empty (`hmac_auto_generate: true`) | Quick start, dev. Needs cluster access (`lookup`), so not for `helm template` / Argo CD |
+| Generated | Leave `postgres_password`, `redis_password` and `common.secrets.hmacs.*` empty (`common.secrets.hmac_auto_generate: true`) | Quick start, dev. Needs cluster access (`lookup`), so not for `helm template` / Argo CD |
 | Values | Set `common.secrets.*` in a values file | Tests. Values end up in the Helm release Secret and usually in git |
 | External Secret (chart-managed) | `common.externalSecret.enabled: true` | Production on AWS Secrets Manager / GCP Secret Manager / Azure Key Vault |
 | Existing Secret | `common.existingSecret: <name>` | **Only** for secrets that do not come from `externalSecret` (Sealed Secrets, Vault Agent, SOPS, `kubectl create secret`) |
@@ -113,6 +113,7 @@ Rules:
 
 - `common.secrets.auth.*` and `common.secrets.main.*` encrypt data. You must set them (the chart fails otherwise)
   and **must never change them after the first install**.
+- Keys that must never change (`common.secrets.hmacs.*`, `auth.application_auth_secret_key`, `main.application_main_secret_key`, `main.secrets_master_key`): on `helm upgrade` the value already stored in the cluster always wins over `values.yaml`. To rotate one, delete the Secret first. Needs `lookup`, so not for `helm template` / Argo CD.
 - With `existingSecret` or `externalSecret` the chart creates no secrets (MCP ones included) and ignores `common.secrets`.
   The Secret must exist before the install and contain these keys:
 
@@ -120,7 +121,7 @@ Rules:
   |---|---|
   | `postgres_user`, `postgres_password` | required, also used by embedded PostgreSQL |
   | `redis_password` | required, may be empty only if Redis has no password |
-  | `rpc_hmac_key`, `event_hmac_key`, `exposure_hmac_key`, `indexer_hmac_key`, `mesh_hmac_key` | required, `openssl rand 40 \| base64 \| tr '/+' '_-'` |
+  | `rpc_hmac_key`, `event_hmac_key`, `exposure_hmac_key`, `indexer_hmac_key`, `mesh_hmac_key` | required, `openssl rand 64 \| base64 -w0 \| tr '/+' '_-'` |
   | `application_auth_secret_key`, `default_admin_password` | required |
   | `application_main_secret_key`, `secrets_master_key` | required, `secrets_master_key` is a Fernet key |
   | `grafana_service_account_token` | only when `mcp_grafana.enabled` |
@@ -185,8 +186,10 @@ spec:
 
 ### ExternalSecret created by the chart (AWS / GCP / Azure)
 
-Store all keys as one JSON secret (see `examples/secret-keys.json`), create the `SecretStore` /
-`ClusterSecretStore` above, then in values:
+Store all keys as one JSON secret (see `examples/secret-keys.json`). With `enabled: true` the chart creates both the
+`SecretStore` (in the release namespace) and the `ExternalSecret`. You only need External Secrets Operator in the
+cluster and a service account (`serviceAccount`) bound to the cloud identity (Workload Identity / IRSA).
+To use an existing (Cluster)SecretStore instead, set `createStore: false` and `storeName` / `storeKind`:
 
 ```yaml
 common:
@@ -194,8 +197,14 @@ common:
     enabled: true
     name: elitea-secrets        # Secret the operator creates, used by all pods
     key: elitea/prod            # JSON secret name in the cloud secret manager (Azure: letters, digits, dashes only, e.g. elitea-prod)
-    storeName: elitea-store
-    storeKind: SecretStore      # or ClusterSecretStore (default)
+    provider: gcp               # gcp | aws | azure
+    gcp: {projectID: my-project, clusterLocation: europe-west1, clusterName: my-cluster}
+    # aws: {region: eu-central-1}
+    # azure: {vaultUrl: "https://my-vault.vault.azure.net"}
+    # serviceAccount: external-secrets-sa
+    # createStore: false        # use your own store instead:
+    # storeName: my-store
+    # storeKind: ClusterSecretStore
 ```
 
 ### Your own ExternalSecret (advanced, with `existingSecret`)

@@ -20,7 +20,6 @@ redis_aws_cloud: false # set to true if using AWS ElastiCache Redis
 redis_queue_random_suffix: xEd34
 pylons_mesh_enabled: false
 autocreate_db: true
-hmac_auto_generate: true
 tracing_enabled: false
 
 #--- Proxy settings ---#
@@ -35,6 +34,8 @@ external_ca_configmap: ""
 external_ca_files: []
 
 common:
+  secrets:
+    hmac_auto_generate: true
   existingSecret: elitea-secrets          # created by externalsecret.yaml
 
   config:

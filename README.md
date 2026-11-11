@@ -113,7 +113,7 @@ Set in `common.secrets.*`, or put them all in your own Secret via `common.existi
 | `auth.default_admin_password` | any strong password | Initial admin password. |
 | `postgres_user` / `postgres_password` | - | Must exist in PostgreSQL before `helm install`. |
 | `redis_password` | - | Leave empty if Redis is not password protected. |
-| `hmacs.*` (`rpc`, `event`, `exposure`, `indexer`, `mesh`) | same as above | Auto-generated when `hmac_auto_generate: true` (default). Not available under `helm template`/Argo CD: set them explicitly there. |
+| `hmacs.*` (`rpc`, `event`, `exposure`, `indexer`, `mesh`) | same as above | Auto-generated when `common.secrets.hmac_auto_generate: true` (default). Not available under `helm template`/Argo CD: set them explicitly there. |
 
 ## Deployment time
 

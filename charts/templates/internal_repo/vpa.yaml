@@ -3,6 +3,8 @@
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
   name: internal-repo-vpa
   namespace: {{ .Release.Namespace | quote }}
   labels:

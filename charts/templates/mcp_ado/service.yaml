@@ -9,6 +9,7 @@ metadata:
     {{- include "elitea.labels" $ | nindent 4 }}
   {{- with .Values.mcp_ado.service.annotations }}
   annotations:
+    argocd.argoproj.io/sync-wave: "5"
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:

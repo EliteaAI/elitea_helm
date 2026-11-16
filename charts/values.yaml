@@ -49,13 +49,13 @@ tolerations: []
 
 common:
   name_prefix: elitea
-  image: "ghcr.io/eliteaai/pylon:1.2.28"
+  image: "ghcr.io/eliteaai/pylon:1.2.31"
   tools_enabled: false # true | false
   elitea_repo_type: standard # standard | internal
-  release: "2.0.7"
+  release: "2.0.8"
 
   images:
-    curl: "curlimages/curl:8.22.0"
+    curl: "curlimages/curl:8.23.0"
     redis: "redis:8.10.3-alpine"
     postgres: "pgvector/pgvector:0.8.7-pg18-trixie"
     deepwiki_worker: "ghcr.io/eliteaai/deepwiki-worker:1.0.8"
@@ -63,7 +63,7 @@ common:
     otel_collector: "otel/opentelemetry-collector-contrib:0.140.0"
     mcp_grafana: "ghcr.io/eliteaai/grafana-mcp:1.0.0"
     mcp_ado: "ghcr.io/eliteaai/ado-mcp:v2.9.0-elitea.1"
-    internal_repo: "ghcr.io/eliteaai/repo:2.0.7"
+    internal_repo: "ghcr.io/eliteaai/repo:2.0.8"
 
   config:
     #--- APP config ---#

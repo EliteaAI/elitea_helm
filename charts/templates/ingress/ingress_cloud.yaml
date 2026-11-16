@@ -6,6 +6,8 @@
 apiVersion: cloud.google.com/v1
 kind: BackendConfig
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
   name: {{ .Values.pylon_main.name_prefix }}-backendconfig
   namespace: {{ .Release.Namespace }}
   labels:
@@ -25,6 +27,7 @@ metadata:
   labels:
     {{- include "elitea.labels" $ | nindent 4 }}
   annotations:
+    argocd.argoproj.io/sync-wave: "5"
     {{- if eq $type "aws" }}
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip

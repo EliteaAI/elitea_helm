@@ -4,6 +4,8 @@
 apiVersion: v1
 kind: Service
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
   name: {{ .Values.postgresql.name_prefix }}-svc
   namespace: {{ .Release.Namespace }}
   labels:
